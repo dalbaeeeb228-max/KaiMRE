@@ -1,0 +1,14 @@
+{
+  "name": "KaiMRE",
+  "description": "Runs MRE/VXP games from the game.vxp file in the package",
+  "version": "1.0.0",
+  "launch_path": "/index.html",
+  "developer": { "name": "Dalba" },
+  "default_locale": "en",
+  "icons": {
+    "32": "/icons/icon32.png",
+    "64": "/icons/icon64.png",
+    "128": "/icons/icon128.png"
+  },
+  "permissions": {}
+}
