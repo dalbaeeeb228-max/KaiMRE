@@ -1,3 +1,6 @@
+// KaiMRE engine: MRE/VXP ARM interpreter and runtime, running in a Web Worker.
+// Plain ES2015 (KaiOS 2.5 / Gecko 48 compatible): no BigInt, no ?. or ??.
+// The DA (STMDA/LDMDA) block-transfer address is ARM-spec correct.
 function __mulS64(a, b) {
   var neg = a < 0 !== b < 0;
   var x = a < 0 ? -a : a, y = b < 0 ? -b : b;
@@ -17,27 +20,6 @@ function __mulS64(a, b) {
   return [hi >>> 0, lo >>> 0];
 }
 "use strict";
-var __defProp = Object.defineProperty;
-var __defProps = Object.defineProperties;
-var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
-var __getOwnPropSymbols = Object.getOwnPropertySymbols;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __propIsEnum = Object.prototype.propertyIsEnumerable;
-var __pow = Math.pow;
-var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-var __spreadValues = (a, b) => {
-  for (var prop in b || (b = {}))
-    if (__hasOwnProp.call(b, prop))
-      __defNormalProp(a, prop, b[prop]);
-  if (__getOwnPropSymbols)
-    for (var prop of __getOwnPropSymbols(b)) {
-      if (__propIsEnum.call(b, prop))
-        __defNormalProp(a, prop, b[prop]);
-    }
-  return a;
-};
-var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
-var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 (() => {
   var Be = { DEV: 1, APP_ID: 2, CERT_ID: 3, NAME: 4, VER: 5, MEM_REQ: 15, RESOLUTION_REQ: 16, COMPILER: 21, NAME_LIST: 25, FILE_TYPE: 33, RO_RW_ZIP: 34, CHARSET: 35 }, an = 800, tr = 240, rr = 320;
   function We(i, e) {
@@ -101,8 +83,8 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
   }
   var de = class {
     constructor(e, t) {
-      __publicField(this, "counts", new Int32Array(16));
-      __publicField(this, "symbols");
+      this.counts = new Int32Array(16);
+      this.symbols = undefined;
       for (let a = 0; a < t; a++) this.counts[e[a]]++;
       this.counts[0] = 0;
       let r = new Int32Array(16), n = 0;
@@ -112,8 +94,8 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     }
   }, gt = class {
     constructor(e, t) {
-      __publicField(this, "acc", 0);
-      __publicField(this, "nbits", 0);
+      this.acc = 0;
+      this.nbits = 0;
       this.src = e;
       this.pos = t;
     }
@@ -249,7 +231,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     if (r !== null) return r;
     if (e + 14 > i.length) return null;
     let n = 0;
-    for (let o = 0; o < 8; o++) n += i[e + 5 + o] * __pow(2, 8 * o);
+    for (let o = 0; o < 8; o++) n += i[e + 5 + o] * Math.pow(2, 8 * o);
     let a = n <= 0 || n > t ? -1 : n;
     return ur(i, e, e + 13, t, a);
   }
@@ -268,8 +250,8 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
   }
   var _t = class {
     constructor(e) {
-      __publicField(this, "buf");
-      __publicField(this, "n", 0);
+      this.buf = undefined;
+      this.n = 0;
       this.buf = new Uint8Array(Math.max(1024, Math.min(e, 65536)));
     }
     get size() {
@@ -287,9 +269,9 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     }
   }, xt = class {
     constructor(e, t) {
-      __publicField(this, "pos");
-      __publicField(this, "range", -1);
-      __publicField(this, "code", 0);
+      this.pos = undefined;
+      this.range = -1;
+      this.code = 0;
       this.input = e;
       this.pos = t;
     }
@@ -322,7 +304,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     }
   }, pe = class {
     constructor(e) {
-      __publicField(this, "probs");
+      this.probs = undefined;
       this.numBitLevels = e;
       this.probs = new Int32Array(1 << e).fill(1024);
     }
@@ -341,10 +323,10 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     }
   }, Ve = class {
     constructor() {
-      __publicField(this, "choice", new Int32Array(2).fill(1024));
-      __publicField(this, "lowCoder", []);
-      __publicField(this, "midCoder", []);
-      __publicField(this, "highCoder", new pe(8));
+      this.choice = new Int32Array(2).fill(1024);
+      this.lowCoder = [];
+      this.midCoder = [];
+      this.highCoder = new pe(8);
       for (let e = 0; e < 16; e++) this.lowCoder.push(new pe(3)), this.midCoder.push(new pe(3));
     }
     decode(e, t) {
@@ -352,9 +334,9 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     }
   }, yt = class {
     constructor(e, t) {
-      __publicField(this, "posMask");
-      __publicField(this, "lc");
-      __publicField(this, "coders", []);
+      this.posMask = undefined;
+      this.lc = undefined;
+      this.coders = [];
       this.posMask = (1 << e) - 1, this.lc = t;
       let r = 1 << e + t;
       for (let n = 0; n < r; n++) this.coders.push(new Int32Array(768).fill(1024));
@@ -382,24 +364,24 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     }
   }, vt = class {
     constructor(e, t, r, n, a) {
-      __publicField(this, "inputConsumed", -1);
-      __publicField(this, "posStateMask");
-      __publicField(this, "isMatch", new Int32Array(192).fill(1024));
-      __publicField(this, "isRep", new Int32Array(12).fill(1024));
-      __publicField(this, "isRepG0", new Int32Array(12).fill(1024));
-      __publicField(this, "isRepG1", new Int32Array(12).fill(1024));
-      __publicField(this, "isRepG2", new Int32Array(12).fill(1024));
-      __publicField(this, "isRep0Long", new Int32Array(192).fill(1024));
-      __publicField(this, "posSlotDecoder", []);
-      __publicField(this, "posDecoders", new Int32Array(114).fill(1024));
-      __publicField(this, "alignDecoder", new pe(4));
-      __publicField(this, "lenDecoder", new Ve());
-      __publicField(this, "repLenDecoder", new Ve());
-      __publicField(this, "literalDecoder");
-      __publicField(this, "dict");
-      __publicField(this, "dictPos", 0);
-      __publicField(this, "out");
-      __publicField(this, "maxOutput");
+      this.inputConsumed = -1;
+      this.posStateMask = undefined;
+      this.isMatch = new Int32Array(192).fill(1024);
+      this.isRep = new Int32Array(12).fill(1024);
+      this.isRepG0 = new Int32Array(12).fill(1024);
+      this.isRepG1 = new Int32Array(12).fill(1024);
+      this.isRepG2 = new Int32Array(12).fill(1024);
+      this.isRep0Long = new Int32Array(192).fill(1024);
+      this.posSlotDecoder = [];
+      this.posDecoders = new Int32Array(114).fill(1024);
+      this.alignDecoder = new pe(4);
+      this.lenDecoder = new Ve();
+      this.repLenDecoder = new Ve();
+      this.literalDecoder = undefined;
+      this.dict = undefined;
+      this.dictPos = 0;
+      this.out = undefined;
+      this.maxOutput = undefined;
       this.posStateMask = (1 << r) - 1;
       for (let o = 0; o < 4; o++) this.posSlotDecoder.push(new pe(6));
       this.literalDecoder = new yt(t, e), this.dict = new Uint8Array(n), this.out = new _t(a), this.maxOutput = a;
@@ -460,10 +442,10 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
   };
   var we = class i {
     constructor() {
-      __publicField(this, "regions", []);
-      __publicField(this, "lowPage", new Uint8Array(4096));
-      __publicField(this, "mappedBytesTotal", 0);
-      __publicField(this, "last", null);
+      this.regions = [];
+      this.lowPage = new Uint8Array(4096);
+      this.mappedBytesTotal = 0;
+      this.last = null;
     }
     map(e, t, r, n, a) {
       if (t <= 0) throw new Error("size must be > 0");
@@ -610,25 +592,25 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
   }
   var Ke = class {
     constructor(e) {
-      __publicField(this, "r", new Int32Array(16));
-      __publicField(this, "n", false);
-      __publicField(this, "z", false);
-      __publicField(this, "c", false);
-      __publicField(this, "v", false);
-      __publicField(this, "thumb", true);
-      __publicField(this, "halted", false);
-      __publicField(this, "instructions", 0);
-      __publicField(this, "apiCalls", 0);
-      __publicField(this, "exitRequested", false);
-      __publicField(this, "maxIns", 2e6);
-      __publicField(this, "haltAddr", 16842748);
-      __publicField(this, "apiBase", 16777216);
-      __publicField(this, "apiEnd", 16842748);
-      __publicField(this, "onApiCall", null);
-      __publicField(this, "fault", null);
-      __publicField(this, "unknownCount", 0);
-      __publicField(this, "semihostingExitAsReturn", false);
-      __publicField(this, "onExit", null);
+      this.r = new Int32Array(16);
+      this.n = false;
+      this.z = false;
+      this.c = false;
+      this.v = false;
+      this.thumb = true;
+      this.halted = false;
+      this.instructions = 0;
+      this.apiCalls = 0;
+      this.exitRequested = false;
+      this.maxIns = 2e6;
+      this.haltAddr = 16842748;
+      this.apiBase = 16777216;
+      this.apiEnd = 16842748;
+      this.onApiCall = null;
+      this.fault = null;
+      this.unknownCount = 0;
+      this.semihostingExitAsReturn = false;
+      this.onExit = null;
       this.mem = e;
     }
     reset(e) {
@@ -897,7 +879,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         this.r[15] = r;
         return;
       }
-      let h = this.r[u] | 0, m = c.length * 4, x = (a === 1 ? n === 1 ? h + 4 : h : h - m) | 0;
+      let h = this.r[u] | 0, m = c.length * 4, x = (a === 1 ? n === 1 ? h + 4 : h : n === 1 ? h - m : h - m + 4) | 0;
       if (l) for (let _ of c) {
         let d = this.mem.read32(x);
         _ === 15 ? (this.thumb = (d & 1) === 1, this.r[15] = d & -2 | 0) : this.r[_] = d | 0, x = x + 4 | 0;
@@ -1368,8 +1350,8 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
   }
   var Ye = class i {
     constructor() {
-      __publicField(this, "fontId", 0);
-      __publicField(this, "explicitSize", 0);
+      this.fontId = 0;
+      this.explicitSize = 0;
     }
     setFont(e) {
       this.fontId = e & 255, this.explicitSize = 0;
@@ -1890,21 +1872,21 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
   }
   var Je = 1610612736, et = 8 * 1024 * 1024, O = -1, Tt = 0, Ln = 48, gr = 32, tt = class {
     constructor(e, t, r) {
-      __publicField(this, "fb565");
-      __publicField(this, "layers", /* @__PURE__ */ new Map());
-      __publicField(this, "surfacesByAddr", /* @__PURE__ */ new Map());
-      __publicField(this, "surfacesByHandle", /* @__PURE__ */ new Map());
-      __publicField(this, "active", O);
-      __publicField(this, "pendingBlt", null);
-      __publicField(this, "nextHandle", 1);
-      __publicField(this, "arenaTop", Je);
-      __publicField(this, "freeArenaBlocks", []);
-      __publicField(this, "decodedImageCache", /* @__PURE__ */ new Map());
-      __publicField(this, "dirty", false);
-      __publicField(this, "flushCount", 0);
-      __publicField(this, "currentColor", 65535);
-      __publicField(this, "text", new Ye());
-      __publicField(this, "screenLayerHandle", O);
+      this.fb565 = undefined;
+      this.layers = /* @__PURE__ */ new Map();
+      this.surfacesByAddr = /* @__PURE__ */ new Map();
+      this.surfacesByHandle = /* @__PURE__ */ new Map();
+      this.active = O;
+      this.pendingBlt = null;
+      this.nextHandle = 1;
+      this.arenaTop = Je;
+      this.freeArenaBlocks = [];
+      this.decodedImageCache = /* @__PURE__ */ new Map();
+      this.dirty = false;
+      this.flushCount = 0;
+      this.currentColor = 65535;
+      this.text = new Ye();
+      this.screenLayerHandle = O;
       this.mem = e;
       this.sw = t;
       this.sh = r;
@@ -2426,15 +2408,15 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
   }
   var rt = class {
     constructor(e, t, r, n = 8) {
-      __publicField(this, "blocks", []);
-      __publicField(this, "allocatedBytes", 0);
-      __publicField(this, "peakAllocatedBytes", 0);
-      __publicField(this, "allocationCalls", 0);
-      __publicField(this, "freeCalls", 0);
-      __publicField(this, "reallocCalls", 0);
-      __publicField(this, "failedAllocations", 0);
-      __publicField(this, "lastFailedRequest", 0);
-      __publicField(this, "lastFailureReason", "");
+      this.blocks = [];
+      this.allocatedBytes = 0;
+      this.peakAllocatedBytes = 0;
+      this.allocationCalls = 0;
+      this.freeCalls = 0;
+      this.reallocCalls = 0;
+      this.failedAllocations = 0;
+      this.lastFailedRequest = 0;
+      this.lastFailureReason = "";
       this.mem = e;
       this.base = t;
       this.capacity = r;
@@ -2577,16 +2559,16 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
   }
   var it = class {
     constructor(e = ["C", "E"]) {
-      __publicField(this, "drives", /* @__PURE__ */ new Map());
-      __publicField(this, "driveBytes", /* @__PURE__ */ new Map());
-      __publicField(this, "handles", /* @__PURE__ */ new Map());
-      __publicField(this, "findHandles", /* @__PURE__ */ new Map());
-      __publicField(this, "attributeOverrides", /* @__PURE__ */ new Map());
-      __publicField(this, "packageFiles", null);
-      __publicField(this, "packageStamp", ae());
-      __publicField(this, "nextHandle", 3);
-      __publicField(this, "nextFindHandle", 65536);
-      __publicField(this, "totalBytes", 0);
+      this.drives = /* @__PURE__ */ new Map();
+      this.driveBytes = /* @__PURE__ */ new Map();
+      this.handles = /* @__PURE__ */ new Map();
+      this.findHandles = /* @__PURE__ */ new Map();
+      this.attributeOverrides = /* @__PURE__ */ new Map();
+      this.packageFiles = null;
+      this.packageStamp = ae();
+      this.nextHandle = 3;
+      this.nextFindHandle = 65536;
+      this.totalBytes = 0;
       for (let t of e) {
         let r = t.toUpperCase();
         this.drives.set(r, { kind: "dir", name: `${r}:\\`, children: /* @__PURE__ */ new Map(), modifiedSeconds: ae() }), this.driveBytes.set(r, 0);
@@ -3030,36 +3012,36 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
   }
   var st = class {
     constructor(e, t = 240, r = 320, n = 16777216, a = 67108864, o = 1048576) {
-      __publicField(this, "cpu");
-      __publicField(this, "gfx");
-      __publicField(this, "heap");
-      __publicField(this, "fs", new it());
-      __publicField(this, "apis", /* @__PURE__ */ new Map());
-      __publicField(this, "handlers", /* @__PURE__ */ new Map());
-      __publicField(this, "systemCallback", 0);
-      __publicField(this, "smCallback", 0);
-      __publicField(this, "keyboardCallback", 0);
-      __publicField(this, "penCallback", 0);
-      __publicField(this, "timers", /* @__PURE__ */ new Map());
-      __publicField(this, "nextTimerId", 1);
-      __publicField(this, "events", []);
-      __publicField(this, "inputEvents", []);
-      __publicField(this, "eventsDispatched", 0);
-      __publicField(this, "timerCallbacks", 0);
-      __publicField(this, "exitCode", 0);
-      __publicField(this, "resolvedNames", []);
-      __publicField(this, "stubbedNames", []);
-      __publicField(this, "namedResources", []);
-      __publicField(this, "resourceBlobSize", 0);
-      __publicField(this, "resourceMappedSize", 0);
-      __publicField(this, "rawExecutableName", "app.vxp");
-      __publicField(this, "cRandState", 1);
-      __publicField(this, "systemStrings", /* @__PURE__ */ new Map());
-      __publicField(this, "ucs2Scratch", 0);
-      __publicField(this, "exitReason", null);
-      __publicField(this, "stubTrace", null);
-      __publicField(this, "errorTrace", null);
-      __publicField(this, "clockOffsetMs", 0);
+      this.cpu = undefined;
+      this.gfx = undefined;
+      this.heap = undefined;
+      this.fs = new it();
+      this.apis = /* @__PURE__ */ new Map();
+      this.handlers = /* @__PURE__ */ new Map();
+      this.systemCallback = 0;
+      this.smCallback = 0;
+      this.keyboardCallback = 0;
+      this.penCallback = 0;
+      this.timers = /* @__PURE__ */ new Map();
+      this.nextTimerId = 1;
+      this.events = [];
+      this.inputEvents = [];
+      this.eventsDispatched = 0;
+      this.timerCallbacks = 0;
+      this.exitCode = 0;
+      this.resolvedNames = [];
+      this.stubbedNames = [];
+      this.namedResources = [];
+      this.resourceBlobSize = 0;
+      this.resourceMappedSize = 0;
+      this.rawExecutableName = "app.vxp";
+      this.cRandState = 1;
+      this.systemStrings = /* @__PURE__ */ new Map();
+      this.ucs2Scratch = 0;
+      this.exitReason = null;
+      this.stubTrace = null;
+      this.errorTrace = null;
+      this.clockOffsetMs = 0;
       this.mem = e;
       this.sw = t;
       this.sh = r;
@@ -3655,30 +3637,30 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
   function Zr(i) {
     var _a, _b;
     let e = nr(i), t = (a, o, l = "") => ({ kind: a, backend: o, sourceSize: i.length, elf: null, raw: null, tags: e, detail: l }), r = false;
-    if (i.length > 67108864) return __spreadProps(__spreadValues({}, t("UNKNOWN", "UNKNOWN")), { detail: `source exceeds ${67108864} bytes` });
-    if (jn(i)) return __spreadProps(__spreadValues({}, t("FLASH_LITE_SWF", "FLASH_LITE")), { detail: "Flash Lite SWF: backend not ported yet" });
-    if (Ot(i, 0)) return __spreadProps(__spreadValues({}, t("ELF32_ARM", "ELF_ARM")), { elf: i });
+    if (i.length > 67108864) return Object.assign({}, t("UNKNOWN", "UNKNOWN"), { detail: `source exceeds ${67108864} bytes` });
+    if (jn(i)) return Object.assign({}, t("FLASH_LITE_SWF", "FLASH_LITE"), { detail: "Flash Lite SWF: backend not ported yet" });
+    if (Ot(i, 0)) return Object.assign({}, t("ELF32_ARM", "ELF_ARM"), { elf: i });
     if (ve(i, 0)) {
       let a = Jn(i), o = (_b = (_a = a == null ? void 0 : a.streams[0]) == null ? void 0 : _a.bytes) != null ? _b : null;
-      if (a === null || o === null) return __spreadProps(__spreadValues({}, t("UNKNOWN", "UNKNOWN")), { detail: "zlib stream could not be inflated" });
-      if (Ot(o, 0)) return o.length > 33554432 ? __spreadProps(__spreadValues({}, t("ZLIB_ELF", "UNKNOWN")), { detail: "inflated executable exceeds safety limit" }) : __spreadProps(__spreadValues({}, t("ZLIB_ELF", "ELF_ARM")), { elf: o });
+      if (a === null || o === null) return Object.assign({}, t("UNKNOWN", "UNKNOWN"), { detail: "zlib stream could not be inflated" });
+      if (Ot(o, 0)) return o.length > 33554432 ? Object.assign({}, t("ZLIB_ELF", "UNKNOWN"), { detail: "inflated executable exceeds safety limit" }) : Object.assign({}, t("ZLIB_ELF", "ELF_ARM"), { elf: o });
       if (zt(o)) {
         let l = Nr(i, a.streams, a.nextOffset);
-        return __spreadProps(__spreadValues({}, t("RAW_ARM_ZLIB", "RAW_ARM")), { raw: l });
+        return Object.assign({}, t("RAW_ARM_ZLIB", "RAW_ARM"), { raw: l });
       }
-      return __spreadProps(__spreadValues({}, t("UNKNOWN", "UNKNOWN")), { detail: "zlib payload is neither ELF nor a RAW ARM MRE image" });
+      return Object.assign({}, t("UNKNOWN", "UNKNOWN"), { detail: "zlib payload is neither ELF nor a RAW ARM MRE image" });
     }
     if (wt(i, 0)) {
       r = true;
       try {
         let a = Ur(i);
-        if (a !== null) return __spreadProps(__spreadValues({}, t("LZMA_RAW_ARM", "RAW_ARM")), { raw: a });
+        if (a !== null) return Object.assign({}, t("LZMA_RAW_ARM", "RAW_ARM"), { raw: a });
       } catch (a) {
-        return __spreadProps(__spreadValues({}, t("LZMA_RAW_ARM", "UNKNOWN")), { detail: a instanceof Error ? a.message : String(a) });
+        return Object.assign({}, t("LZMA_RAW_ARM", "UNKNOWN"), { detail: a instanceof Error ? a.message : String(a) });
       }
     }
     let n = Qn(i);
-    return n >= 0 ? i.length - n > 33554432 ? __spreadProps(__spreadValues({}, t("EMBEDDED_ELF", "UNKNOWN")), { detail: "embedded ELF exceeds safety limit" }) : __spreadProps(__spreadValues({}, t("EMBEDDED_ELF", "ELF_ARM")), { elf: i.slice(n) }) : r ? __spreadProps(__spreadValues({}, t("LZMA_RAW_ARM", "UNKNOWN")), { detail: "LZMA-alone payload is not a RAW ARM MRE image" }) : __spreadProps(__spreadValues({}, t("UNKNOWN", "UNKNOWN")), { detail: "no executable ELF32 payload found" });
+    return n >= 0 ? i.length - n > 33554432 ? Object.assign({}, t("EMBEDDED_ELF", "UNKNOWN"), { detail: "embedded ELF exceeds safety limit" }) : Object.assign({}, t("EMBEDDED_ELF", "ELF_ARM"), { elf: i.slice(n) }) : r ? Object.assign({}, t("LZMA_RAW_ARM", "UNKNOWN"), { detail: "LZMA-alone payload is not a RAW ARM MRE image" }) : Object.assign({}, t("UNKNOWN", "UNKNOWN"), { detail: "no executable ELF32 payload found" });
   }
   var Ue = { maxExecutableBytes: 33554432, maxProgramHeaders: 1024, maxSectionHeaders: 4096, maxRegionBytes: 33554432, maxMappedBytes: 134217728 }, Vr = 40, Dt = 1, Ht = 1, lt = 2, ei = 3, ti = 9, ut = 11, Xr = 8, Ee = 0, ri = 2, ni = 3, ii = 10, si = 21, ai = 22, oi = 23, li = 28, ui = 29, fi = 30, ft = 1, Me = 2, ci = 4;
   function N(i, e) {
@@ -3701,8 +3683,8 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
   }
   var ct = class i {
     constructor(e, t, r, n, a) {
-      __publicField(this, "symbolCache", /* @__PURE__ */ new Map());
-      __publicField(this, "relocErrors", []);
+      this.symbolCache = /* @__PURE__ */ new Map();
+      this.relocErrors = [];
       this.bytes = e;
       this.type = t;
       this.entry = r;
@@ -3873,7 +3855,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         if (!(a.type !== lt && a.type !== ut)) for (let o of this.readSymbols(n)) {
           if (o.shndx === Ee || !o.name || (o.info & 15) !== 2) continue;
           let l = (o.value & -2) + e.loadBias | 0, u = `${o.name}@${l.toString(16)}`;
-          r.has(u) || (r.add(u), t.push(__spreadProps(__spreadValues({}, o), { value: l })));
+          r.has(u) || (r.add(u), t.push(Object.assign({}, o, { value: l })));
         }
       }
       return t.sort((n, a) => n.value - a.value || n.name.localeCompare(a.name));
@@ -5069,11 +5051,11 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
   }
   var Oe = class {
     constructor(e, t, r = 2e7) {
-      __publicField(this, "eventsDispatched", 0);
-      __publicField(this, "timerCallbacks", 0);
-      __publicField(this, "warnings", []);
-      __publicField(this, "createDelivered", false);
-      __publicField(this, "penDropReported", false);
+      this.eventsDispatched = 0;
+      this.timerCallbacks = 0;
+      this.warnings = [];
+      this.createDelivered = false;
+      this.penDropReported = false;
       this.cpu = e;
       this.rt = t;
       this.maxInsPerCallback = r;
@@ -5178,19 +5160,19 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
   };
   var dt = class {
     constructor(e = 2e7, t = 4) {
-      __publicField(this, "mem", new we());
-      __publicField(this, "rt");
-      __publicField(this, "loop", null);
-      __publicField(this, "backend", "UNKNOWN");
-      __publicField(this, "kind", "UNKNOWN");
-      __publicField(this, "pkg", "OTHER");
-      __publicField(this, "lcdW", 240);
-      __publicField(this, "lcdH", 320);
-      __publicField(this, "ramKb", 800);
-      __publicField(this, "entry", 0);
-      __publicField(this, "booted", false);
-      __publicField(this, "warnings", []);
-      __publicField(this, "cpuHook", null);
+      this.mem = new we();
+      this.rt = undefined;
+      this.loop = null;
+      this.backend = "UNKNOWN";
+      this.kind = "UNKNOWN";
+      this.pkg = "OTHER";
+      this.lcdW = 240;
+      this.lcdH = 320;
+      this.ramKb = 800;
+      this.entry = 0;
+      this.booted = false;
+      this.warnings = [];
+      this.cpuHook = null;
       this.maxInsPerCallback = e;
       this.frameBudgetMs = t;
       this.rt = this.newRuntime(this.mem, "app.vxp");
