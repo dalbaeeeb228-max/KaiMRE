@@ -91,7 +91,7 @@ var v_2 = Object.defineProperty,
     for (var v_37 in arg_36 || (arg_36 = {}))
       v_6.call(arg_36, v_37) && fn_9(arg_35, v_37, arg_36[v_37]);
     if (v_5)
-      for (var v_37 of v_5(arg_36)) v_7.call(arg_36, v_37) && fn_9(arg_35, v_37, arg_36[v_37]);
+      for (var v_37b of v_5(arg_36)) v_7.call(arg_36, v_37b) && fn_9(arg_35, v_37b, arg_36[v_37b]);
     return arg_35;
   },
   fn_11 = (arg_38, arg_39) => v_3(arg_38, v_4(arg_39)),

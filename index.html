@@ -567,6 +567,8 @@
     closed = false;
     exitRequested = false;
     hideMenu();
+    scanVisible = false;
+    scannerBox.className = "";
     if (!window.Worker) {
       showStatus("This device cannot run the engine (Web Workers are not supported).", true);
       return;
