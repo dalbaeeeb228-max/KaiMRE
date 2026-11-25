@@ -20,10 +20,10 @@ KaiMRE запускает игры MRE/VXP (файлы `.vxp`) на KaiOS 2.5 (G
 
 При открытии приложения появляется меню:
 
-1. **Игра из пакета (game.vxp)** — запускает `game.vxp` из корня приложения. Если файла нет, появляется сообщение.
-2. **Открыть .vxp с телефона** — открывает системный выбор файлов. Принимаются только файлы с расширением `.vxp`, остальные отклоняются.
-3. **Игра по ссылке ?vxp=...** — появляется, если адрес открыт с параметром `?vxp=`. Сервер с игрой должен разрешать CORS.
-4. **Выход** — подсказка, как закрыть приложение штатными средствами KaiOS.
+1. **Game from package (game.vxp)** — запускает `game.vxp` из корня приложения. Если файла нет, появляется сообщение.
+2. **Open .vxp from phone** — открывает системный выбор файлов. Принимаются только файлы с расширением `.vxp`, остальные отклоняются.
+3. **Game from link ?vxp=...** — появляется, если адрес открыт с параметром `?vxp=`. Сервер с игрой должен разрешать CORS.
+4. **Exit** — подсказка, как закрыть приложение штатными средствами KaiOS.
 
 Навигация: стрелки вверх и вниз — выбор пункта, OK — запуск. Когда игра закрыта, меню открывается снова.
 
@@ -78,10 +78,10 @@ KaiMRE runs MRE/VXP games (`.vxp` files) on KaiOS 2.5 (Gecko 48). The engine run
 
 When the app opens, a menu appears:
 
-1. **Игра из пакета (game.vxp)** — starts `game.vxp` from the app root. If the file is missing, a message is shown.
-2. **Открыть .vxp с телефона** — opens the system file picker. Only files with the `.vxp` extension are accepted; all others are rejected.
-3. **Игра по ссылке ?vxp=...** — shown when the page is opened with a `?vxp=` parameter. The game server must allow CORS.
-4. **Выход** — a hint on how to close the app with the standard KaiOS controls.
+1. **Game from package (game.vxp)** — starts `game.vxp` from the app root. If the file is missing, a message is shown.
+2. **Open .vxp from phone** — opens the system file picker. Only files with the `.vxp` extension are accepted; all others are rejected.
+3. **Game from link ?vxp=...** — shown when the page is opened with a `?vxp=` parameter. The game server must allow CORS.
+4. **Exit** — a hint on how to close the app with the standard KaiOS controls.
 
 Navigation: Up and Down arrows select an item, OK starts it. When a game exits, the menu opens again.
 

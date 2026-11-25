@@ -512,7 +512,7 @@
     midi.stop();
     stopSampled();
     if (worker) { try { worker.terminate(); } catch (e) {} worker = null; }
-    showMenu("Игра закрыта.");
+    showMenu("Game closed.");
   }
   function onWorkerMessage(e) {
     var d = e.data;
@@ -583,11 +583,11 @@
     menuVisible = true;
     menuBox.className = "show";
     menuItems = [
-      { label: "Игра из пакета (game.vxp)", action: loadPackageGame },
-      { label: "Открыть .vxp с телефона", action: openPicker }
+      { label: "Game from package (game.vxp)", action: loadPackageGame },
+      { label: "Open .vxp from phone", action: openPicker }
     ];
-    if (vxpUrl) menuItems.unshift({ label: "Игра по ссылке ?vxp", action: loadLinkGame });
-    menuItems.push({ label: "Выход", action: function () { showStatus("Закройте приложение кнопкой назад.", false); } });
+    if (vxpUrl) menuItems.unshift({ label: "Game from link ?vxp", action: loadLinkGame });
+    menuItems.push({ label: "Exit", action: function () { showStatus("Close the app with the Back key.", false); } });
     menuIndex = 0;
     renderMenu();
     showStatus(message || "", false);
@@ -617,7 +617,7 @@
     }).then(function (buf) {
       startEngine(buf);
     }, function (e) {
-      showMenu("game.vxp не найден в пакете (" + errText(e) + ").");
+      showMenu("game.vxp not found in the package (" + errText(e) + ").");
     });
   }
   function loadLinkGame() {
@@ -628,7 +628,7 @@
     }).then(function (buf) {
       startEngine(buf);
     }, function (e) {
-      showMenu("Не удалось загрузить по ссылке (" + errText(e) + "). Сервер должен разрешать CORS.");
+      showMenu("Could not load from the link (" + errText(e) + "). The server must allow CORS.");
     });
   }
   function openPicker() {
@@ -639,13 +639,13 @@
     var file = pickInput.files && pickInput.files[0];
     if (!file) return;
     if (!isVxpName(file.name)) {
-      showMenu("Можно открыть только файлы .vxp (выбран: " + file.name + ").");
+      showMenu("Only .vxp files can be opened (selected: " + file.name + ").");
       return;
     }
     showStatus("Reading " + file.name + "...", false);
     var reader = new FileReader();
     reader.onload = function () { startEngine(reader.result); };
-    reader.onerror = function () { showMenu("Не удалось прочитать файл " + file.name + "."); };
+    reader.onerror = function () { showMenu("Could not read the file " + file.name + "."); };
     reader.readAsArrayBuffer(file);
   });
 
