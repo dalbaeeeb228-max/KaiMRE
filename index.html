@@ -14,12 +14,27 @@
     font-size: 14px; text-align: center; background: rgba(0, 0, 0, 0.75); display: none; white-space: pre-wrap;
   }
   #status.show { display: block; }
+  #menu {
+    position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: #000; color: #ddd;
+    padding: 10px; box-sizing: border-box; display: none; overflow: hidden;
+  }
+  #menu.show { display: block; }
+  #menu h1 { font-size: 18px; margin: 4px 0 10px; color: #fff; text-align: center; }
+  #menu ul { list-style: none; margin: 0; padding: 0; }
+  #menu li { padding: 10px 6px; font-size: 16px; border-bottom: 1px solid #222; }
+  #menu li.sel { background: #2a5bd7; color: #fff; }
+  #pickFile { display: none; }
   #status.err { color: #ff8080; }
 </style>
 </head>
 <body>
 <canvas id="screen" width="240" height="320"></canvas>
 <div id="status"></div>
+<div id="menu">
+  <h1>KaiMRE</h1>
+  <ul id="menuList"></ul>
+</div>
+<input type="file" id="pickFile" accept=".vxp">
 <script>
 (function () {
   "use strict";
@@ -491,14 +506,13 @@
     }
     if (exitRequested) finish();
   }
-  function finish() {
+  function finish(message) {
     if (closed) return;
     closed = true;
     midi.stop();
     stopSampled();
     if (worker) { try { worker.terminate(); } catch (e) {} worker = null; }
-    try { window.close(); } catch (e) {}
-    setTimeout(function () { showStatus("Game closed. Press the back key to return to the menu.", false); }, 600);
+    showMenu("Игра закрыта.");
   }
   function onWorkerMessage(e) {
     var d = e.data;
@@ -526,6 +540,9 @@
     showStatus("Engine error: " + (e.message || "script failed to load") + where, true);
   }
   function startEngine(bytes) {
+    closed = false;
+    exitRequested = false;
+    hideMenu();
     if (!window.Worker) {
       showStatus("This device cannot run the engine (Web Workers are not supported).", true);
       return;
@@ -545,22 +562,99 @@
     }
   }
 
-  // ---------- load the game: ?vxp=URL, otherwise game.vxp in the package ----------
-  var vxpUrl = getParam("vxp");
-  showStatus("Loading game...", false);
-  var source = vxpUrl ? vxpUrl : "game.vxp";
-  fetch(source).then(function (r) {
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    return r.arrayBuffer();
-  }).then(function (buf) {
-    startEngine(buf);
-  }, function (e) {
-    if (vxpUrl) {
-      showStatus("Cannot download the game from the link (" + errText(e) + "). The server must allow CORS, or put the file into the app as game.vxp.", true);
-    } else {
-      showStatus("game.vxp not found. Put the game file named game.vxp in the app package root. (" + errText(e) + ")", true);
+  // ---------- menu: package game, file picker, or ?vxp=URL ----------
+  var menuVisible = false;
+  var menuItems = [];
+  var menuIndex = 0;
+  var menuBox = document.getElementById("menu");
+  var menuList = document.getElementById("menuList");
+  var pickInput = document.getElementById("pickFile");
+
+  function renderMenu() {
+    menuList.innerHTML = "";
+    for (var i = 0; i < menuItems.length; i++) {
+      var li = document.createElement("li");
+      li.textContent = menuItems[i].label;
+      if (i === menuIndex) li.className = "sel";
+      menuList.appendChild(li);
     }
+  }
+  function showMenu(message) {
+    menuVisible = true;
+    menuBox.className = "show";
+    menuItems = [
+      { label: "Игра из пакета (game.vxp)", action: loadPackageGame },
+      { label: "Открыть .vxp с телефона", action: openPicker }
+    ];
+    if (vxpUrl) menuItems.unshift({ label: "Игра по ссылке ?vxp", action: loadLinkGame });
+    menuItems.push({ label: "Выход", action: function () { showStatus("Закройте приложение кнопкой назад.", false); } });
+    menuIndex = 0;
+    renderMenu();
+    showStatus(message || "", false);
+  }
+  function hideMenu() {
+    menuVisible = false;
+    menuBox.className = "";
+  }
+  function moveMenu(step) {
+    menuIndex = (menuIndex + step + menuItems.length) % menuItems.length;
+    renderMenu();
+  }
+  function activateMenu() {
+    var item = menuItems[menuIndex];
+    if (item && item.action) item.action();
+  }
+
+  // Only .vxp files are accepted.
+  function isVxpName(name) {
+    return /\.vxp$/i.test(name || "");
+  }
+  function loadPackageGame() {
+    showStatus("Loading game...", false);
+    fetch("game.vxp").then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.arrayBuffer();
+    }).then(function (buf) {
+      startEngine(buf);
+    }, function (e) {
+      showMenu("game.vxp не найден в пакете (" + errText(e) + ").");
+    });
+  }
+  function loadLinkGame() {
+    showStatus("Loading game...", false);
+    fetch(vxpUrl).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.arrayBuffer();
+    }).then(function (buf) {
+      startEngine(buf);
+    }, function (e) {
+      showMenu("Не удалось загрузить по ссылке (" + errText(e) + "). Сервер должен разрешать CORS.");
+    });
+  }
+  function openPicker() {
+    pickInput.value = "";
+    pickInput.click();
+  }
+  pickInput.addEventListener("change", function () {
+    var file = pickInput.files && pickInput.files[0];
+    if (!file) return;
+    if (!isVxpName(file.name)) {
+      showMenu("Можно открыть только файлы .vxp (выбран: " + file.name + ").");
+      return;
+    }
+    showStatus("Reading " + file.name + "...", false);
+    var reader = new FileReader();
+    reader.onload = function () { startEngine(reader.result); };
+    reader.onerror = function () { showMenu("Не удалось прочитать файл " + file.name + "."); };
+    reader.readAsArrayBuffer(file);
   });
+
+  var vxpUrl = getParam("vxp");
+  if (vxpUrl) {
+    loadLinkGame();
+  } else {
+    showMenu("");
+  }
 
   // ---------- keys ----------
   var KEY_CODES = {
@@ -581,12 +675,20 @@
   }
   document.addEventListener("keydown", function (e) {
     var name = KEY_NAMES[e.key];
+    if (menuVisible) {
+      if (name === "up") moveMenu(-1);
+      else if (name === "down") moveMenu(1);
+      else if (name === "ok") activateMenu();
+      if (name) e.preventDefault();
+      return;
+    }
     synth.ensure();
     if (synth.ctx && synth.ctx.resume) synth.ctx.resume();
     if (name) { e.preventDefault(); if (!e.repeat) sendKey(2, KEY_CODES[name]); }
   });
   document.addEventListener("keyup", function (e) {
     var name = KEY_NAMES[e.key];
+    if (menuVisible) { if (name) e.preventDefault(); return; }
     if (name) { e.preventDefault(); sendKey(1, KEY_CODES[name]); }
   });
   document.addEventListener("visibilitychange", function () {
