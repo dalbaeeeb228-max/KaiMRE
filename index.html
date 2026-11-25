@@ -24,6 +24,25 @@
   #menu li { padding: 10px 6px; font-size: 16px; border-bottom: 1px solid #222; }
   #menu li.sel { background: #2a5bd7; color: #fff; }
   #pickFile { display: none; }
+  #scanner {
+    position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: #000; color: #ddd;
+    display: none; overflow: hidden;
+  }
+  #scanner.show { display: block; }
+  #scanHeader {
+    position: absolute; left: 0; top: 0; right: 0; height: 28px; padding: 4px 8px; box-sizing: border-box;
+    font-size: 14px; color: #fff; background: #2a5bd7; white-space: nowrap; overflow: hidden;
+  }
+  #scanFoot {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 22px; padding: 2px 8px; box-sizing: border-box;
+    font-size: 12px; color: #aaa; background: #111; white-space: nowrap; overflow: hidden;
+  }
+  #scanList {
+    list-style: none; margin: 0; padding: 0; position: absolute;
+    top: 28px; bottom: 22px; left: 0; right: 0; overflow-y: auto;
+  }
+  #scanList li { padding: 6px 8px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-bottom: 1px solid #222; }
+  #scanList li.sel { background: #2a5bd7; color: #fff; }
   #status.err { color: #ff8080; }
 </style>
 </head>
@@ -33,6 +52,11 @@
 <div id="menu">
   <h1>KaiMRE</h1>
   <ul id="menuList"></ul>
+</div>
+<div id="scanner">
+  <div id="scanHeader">Scanning...</div>
+  <ul id="scanList"></ul>
+  <div id="scanFoot">Up/Down: move  OK: play  Back: menu</div>
 </div>
 <input type="file" id="pickFile" accept=".vxp">
 <script>
@@ -569,6 +593,13 @@
   var menuBox = document.getElementById("menu");
   var menuList = document.getElementById("menuList");
   var pickInput = document.getElementById("pickFile");
+  // Scanner state is declared here, before the first showMenu() call.
+  var scanVisible = false;
+  var scannerBox = document.getElementById("scanner");
+  var scanListEl = document.getElementById("scanList");
+  var scanHeaderEl = document.getElementById("scanHeader");
+  var scanFiles = [];
+  var scanIndex = 0;
 
   function renderMenu() {
     menuList.innerHTML = "";
@@ -580,10 +611,13 @@
     }
   }
   function showMenu(message) {
+    scanVisible = false;
+    scannerBox.className = "";
     menuVisible = true;
     menuBox.className = "show";
     menuItems = [
       { label: "Game from package (game.vxp)", action: loadPackageGame },
+      { label: "Scan SD card for .vxp", action: scanSdcard },
       { label: "Open .vxp from phone", action: openPicker }
     ];
     if (vxpUrl) menuItems.unshift({ label: "Game from link ?vxp", action: loadLinkGame });
@@ -656,6 +690,104 @@
     showMenu("");
   }
 
+  // ---------- SD card scanner (DeviceStorage; needs a privileged app) ----------
+
+  function baseName(name) {
+    return String(name || "").split("/").pop();
+  }
+  function renderScan() {
+    scanListEl.innerHTML = "";
+    for (var i = 0; i < scanFiles.length; i++) {
+      var li = document.createElement("li");
+      li.textContent = (i + 1) + ". " + baseName(scanFiles[i].name);
+      if (i === scanIndex) li.className = "sel";
+      scanListEl.appendChild(li);
+    }
+    scrollScanIntoView();
+  }
+  // Keeps the selected row visible, scrolling up or down.
+  function scrollScanIntoView() {
+    var item = scanListEl.children[scanIndex];
+    if (!item) return;
+    var top = item.offsetTop, bottom = top + item.offsetHeight;
+    if (top < scanListEl.scrollTop) scanListEl.scrollTop = top;
+    else if (bottom > scanListEl.scrollTop + scanListEl.clientHeight) scanListEl.scrollTop = bottom - scanListEl.clientHeight;
+  }
+  function moveScan(step) {
+    if (!scanFiles.length) return;
+    scanIndex = (scanIndex + step + scanFiles.length) % scanFiles.length;
+    var items = scanListEl.children;
+    for (var i = 0; i < items.length; i++) items[i].className = (i === scanIndex) ? "sel" : "";
+    scrollScanIntoView();
+  }
+  function showScanner(title) {
+    menuVisible = false;
+    menuBox.className = "";
+    scanVisible = true;
+    scannerBox.className = "show";
+    scanHeaderEl.textContent = title;
+  }
+  function scanSdcard() {
+    if (!navigator.getDeviceStorages) {
+      showMenu("Scanning needs a privileged install. Use 'Open .vxp from phone' instead.");
+      return;
+    }
+    var stores = [];
+    try { stores = navigator.getDeviceStorages("sdcard") || []; } catch (e) { stores = []; }
+    if (!stores.length) {
+      showMenu("No SD card found.");
+      return;
+    }
+    scanFiles = [];
+    scanIndex = 0;
+    showScanner("Scanning SD card...");
+    scanListEl.innerHTML = "";
+    var pending = stores.length;
+    function done() {
+      pending--;
+      if (pending > 0) return;
+      scanFiles.sort(function (a, b) { return baseName(a.name).toLowerCase() < baseName(b.name).toLowerCase() ? -1 : 1; });
+      if (!scanFiles.length) {
+        showMenu("No .vxp files found on the SD card.");
+        return;
+      }
+      showScanner(scanFiles.length + " .vxp file(s) found");
+      renderScan();
+    }
+    for (var i = 0; i < stores.length; i++) {
+      (function (store) {
+        var cursor = null;
+        try { cursor = store.enumerate(); } catch (e) { cursor = null; }
+        if (!cursor) { done(); return; }
+        cursor.onsuccess = function () {
+          var r = cursor.result;
+          if (r) {
+            if (isVxpName(r.name)) scanFiles.push(r);
+            cursor.continue();
+          } else {
+            done();
+          }
+        };
+        cursor.onerror = function () { done(); };
+      })(stores[i]);
+    }
+  }
+  function playScanned() {
+    var file = scanFiles[scanIndex];
+    if (!file) return;
+    showStatus("Reading " + baseName(file.name) + "...", false);
+    var reader = new FileReader();
+    reader.onload = function () { startEngine(reader.result); };
+    reader.onerror = function () { showMenu("Could not read " + baseName(file.name) + "."); };
+    reader.readAsArrayBuffer(file);
+  }
+  function handleScanKey(name) {
+    if (name === "up") moveScan(-1);
+    else if (name === "down") moveScan(1);
+    else if (name === "ok") playScanned();
+    else if (name === "soft-right" || name === "end") showMenu("");
+  }
+
   // ---------- keys ----------
   var KEY_CODES = {
     "up": -1, "down": -2, "left": -3, "right": -4, "ok": -5,
@@ -675,6 +807,11 @@
   }
   document.addEventListener("keydown", function (e) {
     var name = KEY_NAMES[e.key];
+    if (scanVisible) {
+      handleScanKey(name);
+      if (name) e.preventDefault();
+      return;
+    }
     if (menuVisible) {
       if (name === "up") moveMenu(-1);
       else if (name === "down") moveMenu(1);
@@ -688,7 +825,7 @@
   });
   document.addEventListener("keyup", function (e) {
     var name = KEY_NAMES[e.key];
-    if (menuVisible) { if (name) e.preventDefault(); return; }
+    if (scanVisible || menuVisible) { if (name) e.preventDefault(); return; }
     if (name) { e.preventDefault(); sendKey(1, KEY_CODES[name]); }
   });
   document.addEventListener("visibilitychange", function () {
