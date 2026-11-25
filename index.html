@@ -14,51 +14,12 @@
     font-size: 14px; text-align: center; background: rgba(0, 0, 0, 0.75); display: none; white-space: pre-wrap;
   }
   #status.show { display: block; }
-  #menu {
-    position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: #000; color: #ddd;
-    padding: 10px; box-sizing: border-box; display: none; overflow: hidden;
-  }
-  #menu.show { display: block; }
-  #menu h1 { font-size: 18px; margin: 4px 0 10px; color: #fff; text-align: center; }
-  #menu ul { list-style: none; margin: 0; padding: 0; }
-  #menu li { padding: 10px 6px; font-size: 16px; border-bottom: 1px solid #222; }
-  #menu li.sel { background: #2a5bd7; color: #fff; }
-  #pickFile { display: none; }
-  #scanner {
-    position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: #000; color: #ddd;
-    display: none; overflow: hidden;
-  }
-  #scanner.show { display: block; }
-  #scanHeader {
-    position: absolute; left: 0; top: 0; right: 0; height: 28px; padding: 4px 8px; box-sizing: border-box;
-    font-size: 14px; color: #fff; background: #2a5bd7; white-space: nowrap; overflow: hidden;
-  }
-  #scanFoot {
-    position: absolute; left: 0; right: 0; bottom: 0; height: 22px; padding: 2px 8px; box-sizing: border-box;
-    font-size: 12px; color: #aaa; background: #111; white-space: nowrap; overflow: hidden;
-  }
-  #scanList {
-    list-style: none; margin: 0; padding: 0; position: absolute;
-    top: 28px; bottom: 22px; left: 0; right: 0; overflow-y: auto;
-  }
-  #scanList li { padding: 6px 8px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-bottom: 1px solid #222; }
-  #scanList li.sel { background: #2a5bd7; color: #fff; }
   #status.err { color: #ff8080; }
 </style>
 </head>
 <body>
 <canvas id="screen" width="240" height="320"></canvas>
 <div id="status"></div>
-<div id="menu">
-  <h1>KaiMRE</h1>
-  <ul id="menuList"></ul>
-</div>
-<div id="scanner">
-  <div id="scanHeader">Scanning...</div>
-  <ul id="scanList"></ul>
-  <div id="scanFoot">Up/Down: move  OK: play  Back: menu</div>
-</div>
-<input type="file" id="pickFile" accept=".vxp">
 <script>
 (function () {
   "use strict";
@@ -530,13 +491,14 @@
     }
     if (exitRequested) finish();
   }
-  function finish(message) {
+  function finish() {
     if (closed) return;
     closed = true;
     midi.stop();
     stopSampled();
     if (worker) { try { worker.terminate(); } catch (e) {} worker = null; }
-    showMenu("Game closed.");
+    try { window.close(); } catch (e) {}
+    setTimeout(function () { showStatus("Game closed.", false); }, 600);
   }
   function onWorkerMessage(e) {
     var d = e.data;
@@ -564,11 +526,6 @@
     showStatus("Engine error: " + (e.message || "script failed to load") + where, true);
   }
   function startEngine(bytes) {
-    closed = false;
-    exitRequested = false;
-    hideMenu();
-    scanVisible = false;
-    scannerBox.className = "";
     if (!window.Worker) {
       showStatus("This device cannot run the engine (Web Workers are not supported).", true);
       return;
@@ -588,207 +545,22 @@
     }
   }
 
-  // ---------- menu: package game, file picker, or ?vxp=URL ----------
-  var menuVisible = false;
-  var menuItems = [];
-  var menuIndex = 0;
-  var menuBox = document.getElementById("menu");
-  var menuList = document.getElementById("menuList");
-  var pickInput = document.getElementById("pickFile");
-  // Scanner state is declared here, before the first showMenu() call.
-  var scanVisible = false;
-  var scannerBox = document.getElementById("scanner");
-  var scanListEl = document.getElementById("scanList");
-  var scanHeaderEl = document.getElementById("scanHeader");
-  var scanFiles = [];
-  var scanIndex = 0;
-
-  function renderMenu() {
-    menuList.innerHTML = "";
-    for (var i = 0; i < menuItems.length; i++) {
-      var li = document.createElement("li");
-      li.textContent = menuItems[i].label;
-      if (i === menuIndex) li.className = "sel";
-      menuList.appendChild(li);
-    }
-  }
-  function showMenu(message) {
-    scanVisible = false;
-    scannerBox.className = "";
-    menuVisible = true;
-    menuBox.className = "show";
-    menuItems = [
-      { label: "Game from package (game.vxp)", action: loadPackageGame },
-      { label: "Scan SD card for .vxp", action: scanSdcard },
-      { label: "Open .vxp from phone", action: openPicker }
-    ];
-    if (vxpUrl) menuItems.unshift({ label: "Game from link ?vxp", action: loadLinkGame });
-    menuItems.push({ label: "Exit", action: function () { showStatus("Close the app with the Back key.", false); } });
-    menuIndex = 0;
-    renderMenu();
-    showStatus(message || "", false);
-  }
-  function hideMenu() {
-    menuVisible = false;
-    menuBox.className = "";
-  }
-  function moveMenu(step) {
-    menuIndex = (menuIndex + step + menuItems.length) % menuItems.length;
-    renderMenu();
-  }
-  function activateMenu() {
-    var item = menuItems[menuIndex];
-    if (item && item.action) item.action();
-  }
-
-  // Only .vxp files are accepted.
-  function isVxpName(name) {
-    return /\.vxp$/i.test(name || "");
-  }
-  function loadPackageGame() {
-    showStatus("Loading game...", false);
-    fetch("game.vxp").then(function (r) {
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      return r.arrayBuffer();
-    }).then(function (buf) {
-      startEngine(buf);
-    }, function (e) {
-      showMenu("game.vxp not found in the package (" + errText(e) + ").");
-    });
-  }
-  function loadLinkGame() {
-    showStatus("Loading game...", false);
-    fetch(vxpUrl).then(function (r) {
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      return r.arrayBuffer();
-    }).then(function (buf) {
-      startEngine(buf);
-    }, function (e) {
-      showMenu("Could not load from the link (" + errText(e) + "). The server must allow CORS.");
-    });
-  }
-  function openPicker() {
-    pickInput.value = "";
-    pickInput.click();
-  }
-  pickInput.addEventListener("change", function () {
-    var file = pickInput.files && pickInput.files[0];
-    if (!file) return;
-    if (!isVxpName(file.name)) {
-      showMenu("Only .vxp files can be opened (selected: " + file.name + ").");
-      return;
-    }
-    showStatus("Reading " + file.name + "...", false);
-    var reader = new FileReader();
-    reader.onload = function () { startEngine(reader.result); };
-    reader.onerror = function () { showMenu("Could not read the file " + file.name + "."); };
-    reader.readAsArrayBuffer(file);
-  });
-
+  // ---------- load the game: ?vxp=URL, otherwise game.vxp in the package ----------
   var vxpUrl = getParam("vxp");
-  if (vxpUrl) {
-    loadLinkGame();
-  } else {
-    showMenu("");
-  }
-
-  // ---------- SD card scanner (DeviceStorage; needs a privileged app) ----------
-
-  function baseName(name) {
-    return String(name || "").split("/").pop();
-  }
-  function renderScan() {
-    scanListEl.innerHTML = "";
-    for (var i = 0; i < scanFiles.length; i++) {
-      var li = document.createElement("li");
-      li.textContent = (i + 1) + ". " + baseName(scanFiles[i].name);
-      if (i === scanIndex) li.className = "sel";
-      scanListEl.appendChild(li);
+  showStatus("Loading game...", false);
+  var source = vxpUrl ? vxpUrl : "game.vxp";
+  fetch(source).then(function (r) {
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.arrayBuffer();
+  }).then(function (buf) {
+    startEngine(buf);
+  }, function (e) {
+    if (vxpUrl) {
+      showStatus("Cannot download the game from the link (" + errText(e) + "). The server must allow CORS, or put the file into the app as game.vxp.", true);
+    } else {
+      showStatus("game.vxp not found. Put the game file named game.vxp in the app package root. (" + errText(e) + ")", true);
     }
-    scrollScanIntoView();
-  }
-  // Keeps the selected row visible, scrolling up or down.
-  function scrollScanIntoView() {
-    var item = scanListEl.children[scanIndex];
-    if (!item) return;
-    var top = item.offsetTop, bottom = top + item.offsetHeight;
-    if (top < scanListEl.scrollTop) scanListEl.scrollTop = top;
-    else if (bottom > scanListEl.scrollTop + scanListEl.clientHeight) scanListEl.scrollTop = bottom - scanListEl.clientHeight;
-  }
-  function moveScan(step) {
-    if (!scanFiles.length) return;
-    scanIndex = (scanIndex + step + scanFiles.length) % scanFiles.length;
-    var items = scanListEl.children;
-    for (var i = 0; i < items.length; i++) items[i].className = (i === scanIndex) ? "sel" : "";
-    scrollScanIntoView();
-  }
-  function showScanner(title) {
-    menuVisible = false;
-    menuBox.className = "";
-    scanVisible = true;
-    scannerBox.className = "show";
-    scanHeaderEl.textContent = title;
-  }
-  function scanSdcard() {
-    if (!navigator.getDeviceStorages) {
-      showMenu("Scanning needs a privileged install. Use 'Open .vxp from phone' instead.");
-      return;
-    }
-    var stores = [];
-    try { stores = navigator.getDeviceStorages("sdcard") || []; } catch (e) { stores = []; }
-    if (!stores.length) {
-      showMenu("No SD card found.");
-      return;
-    }
-    scanFiles = [];
-    scanIndex = 0;
-    showScanner("Scanning SD card...");
-    scanListEl.innerHTML = "";
-    var pending = stores.length;
-    function done() {
-      pending--;
-      if (pending > 0) return;
-      scanFiles.sort(function (a, b) { return baseName(a.name).toLowerCase() < baseName(b.name).toLowerCase() ? -1 : 1; });
-      if (!scanFiles.length) {
-        showMenu("No .vxp files found on the SD card.");
-        return;
-      }
-      showScanner(scanFiles.length + " .vxp file(s) found");
-      renderScan();
-    }
-    for (var i = 0; i < stores.length; i++) {
-      (function (store) {
-        var cursor = null;
-        try { cursor = store.enumerate(); } catch (e) { cursor = null; }
-        if (!cursor) { done(); return; }
-        cursor.onsuccess = function () {
-          var r = cursor.result;
-          if (r) {
-            if (isVxpName(r.name)) scanFiles.push(r);
-            cursor.continue();
-          } else {
-            done();
-          }
-        };
-        cursor.onerror = function () { done(); };
-      })(stores[i]);
-    }
-  }
-  function playScanned() {
-    var file = scanFiles[scanIndex];
-    if (!file) return;
-    showStatus("Reading " + baseName(file.name) + "...", false);
-    var reader = new FileReader();
-    reader.onload = function () { startEngine(reader.result); };
-    reader.onerror = function () { showMenu("Could not read " + baseName(file.name) + "."); };
-    reader.readAsArrayBuffer(file);
-  }
-  function handleScanKey(name) {
-    if (name === "up") moveScan(-1);
-    else if (name === "down") moveScan(1);
-    else if (name === "ok") playScanned();
-    else if (name === "soft-right" || name === "end") showMenu("");
-  }
+  });
 
   // ---------- keys ----------
   var KEY_CODES = {
@@ -809,25 +581,12 @@
   }
   document.addEventListener("keydown", function (e) {
     var name = KEY_NAMES[e.key];
-    if (scanVisible) {
-      handleScanKey(name);
-      if (name) e.preventDefault();
-      return;
-    }
-    if (menuVisible) {
-      if (name === "up") moveMenu(-1);
-      else if (name === "down") moveMenu(1);
-      else if (name === "ok") activateMenu();
-      if (name) e.preventDefault();
-      return;
-    }
     synth.ensure();
     if (synth.ctx && synth.ctx.resume) synth.ctx.resume();
     if (name) { e.preventDefault(); if (!e.repeat) sendKey(2, KEY_CODES[name]); }
   });
   document.addEventListener("keyup", function (e) {
     var name = KEY_NAMES[e.key];
-    if (scanVisible || menuVisible) { if (name) e.preventDefault(); return; }
     if (name) { e.preventDefault(); sendKey(1, KEY_CODES[name]); }
   });
   document.addEventListener("visibilitychange", function () {
