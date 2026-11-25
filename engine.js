@@ -39,6 +39,43 @@ function fn_1(arg_13, arg_14) {
   }
   return [v_30 >>> 0, v_28 >>> 0];
 }
+// Cyrillic 5x7 glyphs (capitals). Lowercase is looked up as uppercase by the glyph code.
+var CYRILLIC_GLYPHS = {
+  "А": [14, 17, 17, 31, 17, 17, 17],
+  "Б": [15, 16, 16, 30, 17, 17, 15],
+  "В": [30, 17, 17, 30, 17, 17, 30],
+  "Г": [31, 16, 16, 16, 16, 16, 16],
+  "Д": [14, 10, 10, 10, 31, 17, 17],
+  "Е": [31, 16, 30, 16, 16, 16, 31],
+  "Ё": [10, 31, 16, 30, 16, 16, 31],
+  "Ж": [21, 14, 4, 4, 14, 21, 21],
+  "З": [14, 17, 1, 3, 1, 17, 14],
+  "И": [17, 17, 19, 21, 25, 17, 17],
+  "Й": [10, 17, 19, 21, 25, 17, 17],
+  "К": [17, 18, 20, 24, 20, 18, 17],
+  "Л": [7, 9, 9, 9, 9, 17, 17],
+  "М": [17, 27, 21, 21, 17, 17, 17],
+  "Н": [17, 17, 17, 31, 17, 17, 17],
+  "О": [14, 17, 17, 17, 17, 17, 14],
+  "П": [31, 17, 17, 17, 17, 17, 17],
+  "Р": [30, 17, 17, 30, 16, 16, 16],
+  "С": [14, 17, 16, 16, 16, 17, 14],
+  "Т": [31, 4, 4, 4, 4, 4, 4],
+  "У": [17, 17, 17, 10, 4, 8, 16],
+  "Ф": [4, 14, 21, 21, 21, 14, 4],
+  "Х": [17, 17, 10, 4, 10, 17, 17],
+  "Ц": [18, 18, 18, 18, 18, 31, 1],
+  "Ч": [17, 17, 17, 15, 1, 1, 1],
+  "Ш": [21, 21, 21, 21, 21, 21, 31],
+  "Щ": [21, 21, 21, 21, 21, 31, 1],
+  "Ъ": [24, 8, 8, 14, 9, 9, 14],
+  "Ы": [17, 17, 17, 25, 21, 21, 25],
+  "Ь": [16, 16, 16, 30, 17, 17, 30],
+  "Э": [14, 17, 1, 7, 1, 17, 14],
+  "Ю": [22, 21, 21, 28, 21, 21, 22],
+  "Я": [15, 17, 17, 15, 5, 9, 17],
+};
+
 var v_2 = Object.defineProperty,
   v_3 = Object.defineProperties,
   v_4 = Object.getOwnPropertyDescriptors,
@@ -2191,6 +2228,7 @@ var v_2 = Object.defineProperty,
     static glyph(arg_828) {
       var v_829;
       let v_830 = String.fromCharCode(arg_828).toUpperCase();
+      if (CYRILLIC_GLYPHS[v_830]) return CYRILLIC_GLYPHS[v_830];
       return arg_828 < 32 || arg_828 === 127
         ? obj_84[" "]
         : (v_829 = obj_84[v_830]) != null
@@ -4888,15 +4926,51 @@ var v_2 = Object.defineProperty,
   function fn_146(arg_1862, arg_1863, arg_1864) {
     return arg_1862 < arg_1863 ? arg_1863 : arg_1862 > arg_1864 ? arg_1864 : arg_1862;
   }
-  var v_147;
-  function fn_148() {
-    if (v_147 !== void 0) return v_147;
-    try {
-      v_147 = new TextDecoder("gbk");
-    } catch (v_1865) {
-      v_147 = null;
+  // Text encoding of guest strings. "auto" (default): UTF-8 when the bytes are valid UTF-8,
+  // otherwise Windows-1251 (Cyrillic, used by Russian games). "gbk" keeps the old
+  // Chinese decoding. The page selects it with ?charset=gbk.
+  var textCharset = "auto";
+  // Windows-1251 code points for bytes 0x80..0xFF.
+  var CP1251_HIGH = [
+    0x0402, 0x0403, 0x201a, 0x0453, 0x201e, 0x2026, 0x2020, 0x2021, 0x20ac, 0x2030, 0x0409,
+    0x2039, 0x040a, 0x040c, 0x040b, 0x040f, 0x0452, 0x2018, 0x2019, 0x201c, 0x201d, 0x2022,
+    0x2013, 0x2014, 0xfffd, 0x2122, 0x0459, 0x203a, 0x045a, 0x045c, 0x045b, 0x045f, 0x00a0,
+    0x040e, 0x045e, 0x0408, 0x00a4, 0x0490, 0x00a6, 0x00a7, 0x0401, 0x00a9, 0x0404, 0x00ab,
+    0x00ac, 0x00ad, 0x00ae, 0x0407, 0x00b0, 0x00b1, 0x0406, 0x0456, 0x0491, 0x00b5, 0x00b6,
+    0x00b7, 0x0451, 0x2116, 0x0454, 0x00bb, 0x0458, 0x0405, 0x0455, 0x0457
+  ];
+  function cp1251Char(b) {
+    if (b < 0x80) return b;
+    if (b < 0xc0) return CP1251_HIGH[b - 0x80];
+    if (b < 0xe0) return 0x0410 + (b - 0xc0);
+    return 0x0430 + (b - 0xe0);
+  }
+  // Strict UTF-8 check and decode. Returns null if the bytes are not valid UTF-8.
+  function decodeUtf8Strict(bytes) {
+    var out = "", i = 0, n = bytes.length;
+    while (i < n) {
+      var c = bytes[i], need = 0, cp = 0, min = 0;
+      if (c < 0x80) { out += String.fromCharCode(c); i++; continue; }
+      if (c >= 0xc2 && c <= 0xdf) { need = 1; cp = c & 0x1f; min = 0x80; }
+      else if (c >= 0xe0 && c <= 0xef) { need = 2; cp = c & 0x0f; min = 0x800; }
+      else if (c >= 0xf0 && c <= 0xf4) { need = 3; cp = c & 0x07; min = 0x10000; }
+      else return null;
+      if (i + need >= n) return null;
+      for (var k = 1; k <= need; k++) {
+        var cc = bytes[i + k];
+        if ((cc & 0xc0) !== 0x80) return null;
+        cp = (cp << 6) | (cc & 0x3f);
+      }
+      if (cp < min || cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff)) return null;
+      out += String.fromCodePoint(cp);
+      i += need + 1;
     }
-    return v_147;
+    return out;
+  }
+  function decodeGbk(bytes) {
+    var dec = null;
+    try { dec = new TextDecoder("gbk"); } catch (e) { dec = null; }
+    return dec ? dec.decode(bytes) : null;
   }
   function fn_149(arg_1866, arg_1867, arg_1868) {
     let list_1869 = [],
@@ -4914,18 +4988,23 @@ var v_2 = Object.defineProperty,
     return Uint8Array.from(list_1869);
   }
   function fn_150(arg_1873, arg_1874) {
-    let v_1875 = !1;
-    for (let num_1878 = 0; num_1878 < arg_1873.length; num_1878++)
-      if (arg_1873[num_1878] >= 128) {
-        v_1875 = !0;
-        break;
-      }
-    let v_1876 = arg_1874 && v_1875 ? fn_148() : null;
-    if (v_1876 !== null) return v_1876.decode(arg_1873);
-    let str_1877 = "";
-    for (let num_1879 = 0; num_1879 < arg_1873.length; num_1879++)
-      str_1877 += String.fromCharCode(arg_1873[num_1879]);
-    return str_1877;
+    var hasHigh = false, i;
+    for (i = 0; i < arg_1873.length; i++) {
+      if (arg_1873[i] >= 128) { hasHigh = true; break; }
+    }
+    var text = "";
+    if (!hasHigh) {
+      for (i = 0; i < arg_1873.length; i++) text += String.fromCharCode(arg_1873[i]);
+      return text;
+    }
+    if (textCharset === "gbk" && arg_1874) {
+      var g = decodeGbk(arg_1873);
+      if (g !== null) return g;
+    }
+    var u = decodeUtf8Strict(arg_1873);
+    if (u !== null) return u;
+    for (i = 0; i < arg_1873.length; i++) text += String.fromCharCode(cp1251Char(arg_1873[i]));
+    return text;
   }
   var v_151 = class {
       constructor(
@@ -9119,6 +9198,7 @@ var v_2 = Object.defineProperty,
         var v_3252, v_3253, v_3254, v_3255, v_3256, v_3257, v_3258, v_3259;
         switch (arg_3251.type) {
           case "load": {
+            textCharset = arg_3251.charset === "gbk" ? "gbk" : "auto";
             let uint8Array_3260 = new Uint8Array(
               (v_3252 = arg_3251.bytes) != null ? v_3252 : new ArrayBuffer(0)
             );
