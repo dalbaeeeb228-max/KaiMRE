@@ -1,77 +1,52 @@
-# KaiMRE / КаиМРЕ
+# KaiMRE
 
-[Русский](#русский) · [English](#english)
+Запуск игр MRE/VXP на KaiOS 2.5 (браузер Gecko 48).
+An MRE/VXP game runtime for KaiOS 2.5 (Gecko 48).
 
----
+Весь исходный код открыт и не минифицирован: `index.html`, `engine.js`, `manifest.webapp`.
+All source is open and not minified or obfuscated: `index.html`, `engine.js`, `manifest.webapp`.
 
-## Русский
+## Содержимое / Contents
 
-KaiMRE запускает игры MRE/VXP (`.vxp`) на KaiOS 2.5. Движок работает в Web Worker, экран, звук и клавиатура обрабатываются на странице.
+- `index.html` — страница: экран, масштабирование, загрузка игры, MIDI и звук, клавиши.
+  Page: screen, scaling, game loading, MIDI and sound, keys.
+- `engine.js` — движок (VXP/ARM-интерпретатор) в Web Worker.
+  Engine (VXP/ARM interpreter) running in a Web Worker.
+- `manifest.webapp` — манифест KaiOS-приложения (без специальных прав).
+  KaiOS app manifest (no special permissions).
+- `icons/` — иконки приложения.
+  App icons.
 
-### Состав
+## Запуск игры / Starting a game
 
-- `index.html` — страница приложения.
-- `engine.js` — движок MRE/VXP.
-- `manifest.webapp` — манифест KaiOS.
-- `icons/` — иконки.
-- `game.vxp` — необязательно: игра, встроенная в пакет.
+1. Положите игру в файл `game.vxp` рядом с `index.html` в пакете приложения.
+   Put the game in a file named `game.vxp` next to `index.html` in the app package.
+2. Либо откройте приложение со ссылкой на игру: `index.html?vxp=<адрес .vxp>`.
+   Сервер должен разрешать загрузку с другого домена (заголовок `Access-Control-Allow-Origin`), иначе игра не загрузится.
+   Or open the app with a link to a game: `index.html?vxp=<URL of .vxp>`.
+   The server must allow cross-origin downloads (`Access-Control-Allow-Origin`), otherwise the game will not load.
+3. Кнопка «Назад» (Back) закрывает игру.
+   The Back key closes the game.
 
-### Запуск игры
+## Звук / Sound
 
-1. **Игра внутри приложения.** Положите `game.vxp` рядом с `index.html` и упакуйте приложение. Работает без сети.
-2. **Игра по ссылке.** Откройте приложение с параметром `?vxp=` и адресом игры, например:
-   `https://kaimre.iblogger.org/?vxp=https%3A%2F%2Fcfcgh.com%2Fspiderman.vxp`
-   Сервер с игрой должен разрешать CORS (заголовок `Access-Control-Allow-Origin`). Иначе появится ошибка загрузки. В этом случае положите файл в приложение как `game.vxp`.
+- MIDI проигрывается один раз. Добавьте `&loop=1` к ссылке, чтобы зациклить.
+  MIDI plays once. Add `&loop=1` to the link to loop it.
+- WAV, MP3, OGG воспроизводятся как обычный звук, если устройство умеет этот формат.
+  WAV, MP3 and OGG are played as sampled audio when the device supports the format.
+- MIDI синтезируется приближённо (формы волн и огибающие по инструментам, ударные из шума), это не настоящий набор GM.
+  MIDI is a synthesized approximation (waveforms and envelopes per instrument, drums from noise), not the real GM sound set.
 
-### Звук
+## Ограничения / Limitations
 
-- MIDI по умолчанию воспроизводится один раз. Добавьте `&loop=1` к ссылке, чтобы зациклить.
-- WAV, MP3 и OGG воспроизводятся через `<audio>`, если телефон поддерживает формат.
-- MIDI играет встроенный синтезатор. Это приближение, а не настоящие инструменты General MIDI.
+- Нет 3D.
+  No 3D.
+- Нет выбора файлов на телефоне и сканера SD-карты: игра берётся из пакета или по ссылке.
+  No file picker and no SD card scanner: the game comes from the package or from a link.
+- Совместимость с KaiOS 2.5 проверена только на уровне синтаксиса и в браузере Chromium; на реальном устройстве проверяйте сами.
+  KaiOS 2.5 compatibility is checked for syntax and in Chromium only; test on a real device yourself.
 
-### Ограничения
+## Установка / Installing
 
-- 3D-графики нет.
-- Выбора файлов с телефона и сканирования карты в этой версии нет.
-
-### Установка
-
-1. Соберите пакет из `index.html`, `engine.js`, `manifest.webapp`, `icons/` и, при необходимости, `game.vxp`.
-2. Установите через KaiOS Sideload или разместите на HTTPS-хостинге.
-
----
-
-## English
-
-KaiMRE runs MRE/VXP games (`.vxp`) on KaiOS 2.5. The engine runs in a Web Worker; the screen, sound and keypad are handled by the page.
-
-### Contents
-
-- `index.html` — the app page.
-- `engine.js` — the MRE/VXP engine.
-- `manifest.webapp` — the KaiOS manifest.
-- `icons/` — app icons.
-- `game.vxp` — optional: a game bundled in the package.
-
-### Starting a game
-
-1. **Game inside the app.** Put `game.vxp` next to `index.html` and package the app. Works offline.
-2. **Game from a link.** Open the app with the `?vxp=` parameter and the game address, for example:
-   `https://kaimre.iblogger.org/?vxp=https%3A%2F%2Fcfcgh.com%2Fspiderman.vxp`
-   The game server must allow CORS (the `Access-Control-Allow-Origin` header). Otherwise a loading error is shown. In that case, put the file into the app as `game.vxp`.
-
-### Sound
-
-- MIDI plays once by default. Add `&loop=1` to the link to loop it.
-- WAV, MP3 and OGG are played through `<audio>` when the phone supports the format.
-- MIDI is played by a built-in synthesizer. It is an approximation, not real General MIDI instruments.
-
-### Limitations
-
-- There is no 3D rendering.
-- This version has no phone file picker and no SD card scanner.
-
-### Installing
-
-1. Package `index.html`, `engine.js`, `manifest.webapp`, `icons/` and, if needed, `game.vxp`.
-2. Install through KaiOS Sideload, or host the files on HTTPS.
+Упакуйте файлы в zip (с `index.html` в корне) и установите через KaiOS-установщик.
+Zip the files (with `index.html` at the root) and install them with a KaiOS installer.

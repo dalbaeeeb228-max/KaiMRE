@@ -23,576 +23,641 @@
 <script>
 (function () {
   "use strict";
-
-  // ---------- helpers ----------
-  var statusBox = document.getElementById("status");
-  function showStatus(text, isError) {
-    statusBox.className = (isError ? "err" : "") + (text ? " show" : "");
-    statusBox.textContent = text || "";
+  var J = document.getElementById("status");
+  function p(e, t) {
+    ((J.className = (t ? "err" : "") + (e ? " show" : "")), (J.textContent = e || ""));
   }
-  function errText(e) {
-    if (!e) return "unknown";
-    return e.message || String(e);
+  function S(e) {
+    return e ? e.message || String(e) : "unknown";
   }
-  function getParam(name) {
-    var q = (location.search || "").replace(/^\?/, "");
-    var parts = q.split("&");
-    for (var i = 0; i < parts.length; i++) {
-      var kv = parts[i].split("=");
-      if (decodeURIComponent(kv[0]) === name) {
-        return kv.length > 1 ? decodeURIComponent(kv.slice(1).join("=")) : "";
-      }
+  function G(e) {
+    for (
+      var t = (location.search || "").replace(/^\?/, ""), r = t.split("&"), s = 0;
+      s < r.length;
+      s++
+    ) {
+      var a = r[s].split("=");
+      if (decodeURIComponent(a[0]) === e)
+        return a.length > 1 ? decodeURIComponent(a.slice(1).join("=")) : "";
     }
     return null;
   }
-  // loop=1 in the address bar turns looping on. Default: play every sound once.
-  var allowLoop = getParam("loop") === "1";
-  // ?charset=gbk keeps the old Chinese text decoding; default is UTF-8 / Windows-1251.
-  var textCharset = getParam("charset") === "gbk" ? "gbk" : "auto";
-
-  // ---------- screen ----------
-  var canvas = document.getElementById("screen");
-  var ctx2d = canvas.getContext("2d");
-  // Scale the 240x320 game to the largest size that fits the window, centred.
-  function fitScreen() {
-    var scale = Math.min(window.innerWidth / 240, window.innerHeight / 320);
-    if (!(scale > 0)) scale = 1;
-    var w = Math.floor(240 * scale), h = Math.floor(320 * scale);
-    canvas.style.width = w + "px";
-    canvas.style.height = h + "px";
-    canvas.style.left = Math.floor((window.innerWidth - w) / 2) + "px";
-    canvas.style.top = Math.floor((window.innerHeight - h) / 2) + "px";
+  var X = G("loop") === "1",
+    pe = G("charset") === "gbk" ? "gbk" : "auto",
+    R = document.getElementById("screen"),
+    Z = R.getContext("2d");
+  function $() {
+    var e = Math.min(window.innerWidth / 240, window.innerHeight / 320);
+    e > 0 || (e = 1);
+    var t = Math.floor(240 * e),
+      r = Math.floor(320 * e);
+    ((R.style.width = t + "px"),
+      (R.style.height = r + "px"),
+      (R.style.left = Math.floor((window.innerWidth - t) / 2) + "px"),
+      (R.style.top = Math.floor((window.innerHeight - r) / 2) + "px"));
   }
-  fitScreen();
-  window.addEventListener("resize", fitScreen);
-  var imageData = ctx2d.createImageData(240, 320);
-  var out32 = new Uint32Array(imageData.data.buffer);
-  // RGB565 -> packed RGBA lookup, built once. One 32-bit write per pixel is much
-  // cheaper than four byte writes on a low-end KaiOS CPU.
-  var littleEndian = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
-  var lut = new Uint32Array(65536);
+  ($(), window.addEventListener("resize", $));
+  var b = Z.createImageData(240, 320),
+    ee = new Uint32Array(b.data.buffer),
+    ve = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1,
+    te = new Uint32Array(65536);
   (function () {
-    for (var v = 0; v < 65536; v++) {
-      var lr = (v >> 11) & 31, lg = (v >> 5) & 63, lb = v & 31;
-      var R = (lr << 3) | (lr >> 2), G = (lg << 2) | (lg >> 4), B = (lb << 3) | (lb >> 2);
-      lut[v] = littleEndian ? ((255 << 24) | (B << 16) | (G << 8) | R) >>> 0
-                            : ((R << 24) | (G << 16) | (B << 8) | 255) >>> 0;
+    for (var e = 0; e < 65536; e++) {
+      var t = (e >> 11) & 31,
+        r = (e >> 5) & 63,
+        s = e & 31,
+        a = (t << 3) | (t >> 2),
+        u = (r << 2) | (r >> 4),
+        i = (s << 3) | (s >> 2);
+      te[e] = ve
+        ? ((255 << 24) | (i << 16) | (u << 8) | a) >>> 0
+        : ((a << 24) | (u << 16) | (i << 8) | 255) >>> 0;
     }
   })();
-
-  function drawFrame(px) {
-    var n = Math.min(px.length, out32.length);
-    for (var i = 0; i < n; i++) out32[i] = lut[px[i] & 0xFFFF];
-    ctx2d.putImageData(imageData, 0, 0);
+  function de(e) {
+    for (var t = Math.min(e.length, ee.length), r = 0; r < t; r++) ee[r] = te[e[r] & 65535];
+    Z.putImageData(b, 0, 0);
   }
-
-  // ---------- MIDI parser (SMF type 0 and 1) ----------
-  function parseMidi(d) {
-    function str4(o) { return String.fromCharCode(d[o], d[o + 1], d[o + 2], d[o + 3]); }
-    function u32(o) { return ((d[o] << 24) | (d[o + 1] << 16) | (d[o + 2] << 8) | d[o + 3]) >>> 0; }
-    function u16(o) { return (d[o] << 8) | d[o + 1]; }
-    if (d.length < 14 || str4(0) !== "MThd") return null;
-    var hdrLen = u32(4), ntrk = u16(10), div = u16(12);
-    var ppq = (div & 0x8000) ? 480 : div;
-    if (!ppq) ppq = 480;
-    var raw = [];
-    var p = 8 + hdrLen, tracks = 0;
-    while (p + 8 <= d.length && tracks < ntrk) {
-      var id = str4(p), len = u32(p + 4);
-      p += 8;
-      var end = Math.min(d.length, p + len);
-      if (id !== "MTrk") { p = end; continue; }
-      tracks++;
-      var q = p, tick = 0, running = 0;
-      while (q < end) {
-        // variable-length delta time
-        var v = 0, b;
-        do { b = d[q++]; v = v * 128 + (b & 127); } while ((b & 128) && q < end);
-        tick += v;
-        var st = d[q];
-        if (st & 0x80) { running = st; q++; } else { st = running; }
-        if (st === 0xFF) {
-          var type = d[q++];
-          var l = 0;
-          do { b = d[q++]; l = l * 128 + (b & 127); } while ((b & 128) && q < end);
-          if (type === 0x51 && l === 3) {
-            raw.push({ tick: tick, kind: "tempo", us: (d[q] << 16) | (d[q + 1] << 8) | d[q + 2] });
+  function me(e) {
+    function t(f) {
+      return String.fromCharCode(e[f], e[f + 1], e[f + 2], e[f + 3]);
+    }
+    function r(f) {
+      return ((e[f] << 24) | (e[f + 1] << 16) | (e[f + 2] << 8) | e[f + 3]) >>> 0;
+    }
+    function s(f) {
+      return (e[f] << 8) | e[f + 1];
+    }
+    if (e.length < 14 || t(0) !== "MThd") return null;
+    var a = r(4),
+      u = s(10),
+      i = s(12),
+      n = i & 32768 ? 480 : i;
+    n || (n = 480);
+    for (var o = [], c = 8 + a, h = 0; c + 8 <= e.length && h < u; ) {
+      var w = t(c),
+        A = r(c + 4);
+      c += 8;
+      var g = Math.min(e.length, c + A);
+      if (w !== "MTrk") {
+        c = g;
+        continue;
+      }
+      h++;
+      for (var l = c, M = 0, oe = 0; l < g; ) {
+        var Y = 0,
+          x;
+        do ((x = e[l++]), (Y = Y * 128 + (x & 127)));
+        while (x & 128 && l < g);
+        M += Y;
+        var k = e[l];
+        if ((k & 128 ? ((oe = k), l++) : (k = oe), k === 255)) {
+          var ue = e[l++],
+            I = 0;
+          do ((x = e[l++]), (I = I * 128 + (x & 127)));
+          while (x & 128 && l < g);
+          if (
+            (ue === 81 &&
+              I === 3 &&
+              o.push({ tick: M, kind: "tempo", us: (e[l] << 16) | (e[l + 1] << 8) | e[l + 2] }),
+            ue === 47)
+          ) {
+            l = g;
+            break;
           }
-          if (type === 0x2F) { q = end; break; }
-          q += l;
-        } else if (st === 0xF0 || st === 0xF7) {
-          var l2 = 0;
-          do { b = d[q++]; l2 = l2 * 128 + (b & 127); } while ((b & 128) && q < end);
-          q += l2;
+          l += I;
+        } else if (k === 240 || k === 247) {
+          var _ = 0;
+          do ((x = e[l++]), (_ = _ * 128 + (x & 127)));
+          while (x & 128 && l < g);
+          l += _;
         } else {
-          var hi = st & 0xF0, ch = st & 0x0F;
-          if (hi === 0xC0) {
-            raw.push({ tick: tick, kind: "prog", ch: ch, val: d[q++] });
-          } else if (hi === 0xD0) {
-            q++;
-          } else {
-            var n1 = d[q++], n2 = d[q++];
-            if (hi === 0x90 && n2 > 0) raw.push({ tick: tick, kind: "on", ch: ch, note: n1, vel: n2 });
-            else if (hi === 0x80 || hi === 0x90) raw.push({ tick: tick, kind: "off", ch: ch, note: n1 });
-            else if (hi === 0xB0) raw.push({ tick: tick, kind: "cc", ch: ch, cc: n1, val: n2 });
-            else if (hi === 0xE0) raw.push({ tick: tick, kind: "bend", ch: ch, val: ((n2 << 7) | n1) - 8192 });
+          var F = k & 240,
+            D = k & 15;
+          if (F === 192) o.push({ tick: M, kind: "prog", ch: D, val: e[l++] });
+          else if (F === 208) l++;
+          else {
+            var O = e[l++],
+              P = e[l++];
+            F === 144 && P > 0
+              ? o.push({ tick: M, kind: "on", ch: D, note: O, vel: P })
+              : F === 128 || F === 144
+                ? o.push({ tick: M, kind: "off", ch: D, note: O })
+                : F === 176
+                  ? o.push({ tick: M, kind: "cc", ch: D, cc: O, val: P })
+                  : F === 224 &&
+                    o.push({ tick: M, kind: "bend", ch: D, val: ((P << 7) | O) - 8192 });
           }
         }
       }
-      p = end;
+      c = g;
     }
-    // stable sort by tick
-    for (var k = 0; k < raw.length; k++) raw[k].order = k;
-    raw.sort(function (a, b2) { return (a.tick - b2.tick) || (a.order - b2.order); });
-    // convert ticks to seconds using tempo changes
-    var tempo = 500000, t = 0, last = 0, events = [];
-    for (var j = 0; j < raw.length; j++) {
-      var r = raw[j];
-      t += (r.tick - last) * tempo / (ppq * 1000000);
-      last = r.tick;
-      if (r.kind === "tempo") { tempo = r.us; continue; }
-      r.t = t;
-      events.push(r);
+    for (var W = 0; W < o.length; W++) o[W].order = W;
+    o.sort(function (f, he) {
+      return f.tick - he.tick || f.order - he.order;
+    });
+    for (var le = 5e5, q = 0, ce = 0, fe = [], Q = 0; Q < o.length; Q++) {
+      var C = o[Q];
+      if (((q += ((C.tick - ce) * le) / (n * 1e6)), (ce = C.tick), C.kind === "tempo")) {
+        le = C.us;
+        continue;
+      }
+      ((C.t = q), fe.push(C));
     }
-    return { events: events, duration: t };
+    return { events: fe, duration: q };
   }
-
-  // ---------- MIDI synth (approximation, not GM samples) ----------
-  // Per instrument family: waveform and envelope.
-  var FAMILIES = [
-    { from: 0,  to: 15,  wave: "triangle", a: 0.005, d: 0.30, s: 0.35, r: 0.08 }, // piano, chromatic perc
-    { from: 16, to: 23,  wave: "square",   a: 0.01,  d: 0.05, s: 0.80, r: 0.05 }, // organ
-    { from: 24, to: 31,  wave: "triangle", a: 0.005, d: 0.50, s: 0.20, r: 0.12 }, // guitar
-    { from: 32, to: 39,  wave: "square",   a: 0.005, d: 0.20, s: 0.60, r: 0.06 }, // bass
-    { from: 40, to: 47,  wave: "sawtooth", a: 0.12,  d: 0.20, s: 0.70, r: 0.25 }, // strings
-    { from: 48, to: 55,  wave: "sawtooth", a: 0.15,  d: 0.20, s: 0.70, r: 0.30 }, // ensemble
-    { from: 56, to: 63,  wave: "sawtooth", a: 0.06,  d: 0.15, s: 0.75, r: 0.12 }, // brass
-    { from: 64, to: 71,  wave: "square",   a: 0.04,  d: 0.10, s: 0.70, r: 0.10 }, // reed
-    { from: 72, to: 79,  wave: "sine",     a: 0.05,  d: 0.10, s: 0.80, r: 0.15 }, // pipe
-    { from: 80, to: 87,  wave: "square",   a: 0.01,  d: 0.05, s: 0.80, r: 0.10 }, // synth lead
-    { from: 88, to: 95,  wave: "sawtooth", a: 0.30,  d: 0.30, s: 0.60, r: 0.50 }, // synth pad
-    { from: 96, to: 127, wave: "triangle", a: 0.02,  d: 0.20, s: 0.50, r: 0.20 }  // fx / other
+  var V = [
+    { from: 0, to: 15, wave: "triangle", a: 0.005, d: 0.3, s: 0.35, r: 0.08 },
+    { from: 16, to: 23, wave: "square", a: 0.01, d: 0.05, s: 0.8, r: 0.05 },
+    { from: 24, to: 31, wave: "triangle", a: 0.005, d: 0.5, s: 0.2, r: 0.12 },
+    { from: 32, to: 39, wave: "square", a: 0.005, d: 0.2, s: 0.6, r: 0.06 },
+    { from: 40, to: 47, wave: "sawtooth", a: 0.12, d: 0.2, s: 0.7, r: 0.25 },
+    { from: 48, to: 55, wave: "sawtooth", a: 0.15, d: 0.2, s: 0.7, r: 0.3 },
+    { from: 56, to: 63, wave: "sawtooth", a: 0.06, d: 0.15, s: 0.75, r: 0.12 },
+    { from: 64, to: 71, wave: "square", a: 0.04, d: 0.1, s: 0.7, r: 0.1 },
+    { from: 72, to: 79, wave: "sine", a: 0.05, d: 0.1, s: 0.8, r: 0.15 },
+    { from: 80, to: 87, wave: "square", a: 0.01, d: 0.05, s: 0.8, r: 0.1 },
+    { from: 88, to: 95, wave: "sawtooth", a: 0.3, d: 0.3, s: 0.6, r: 0.5 },
+    { from: 96, to: 127, wave: "triangle", a: 0.02, d: 0.2, s: 0.5, r: 0.2 },
   ];
-  function familyFor(prog) {
-    for (var i = 0; i < FAMILIES.length; i++) {
-      if (prog >= FAMILIES[i].from && prog <= FAMILIES[i].to) return FAMILIES[i];
-    }
-    return FAMILIES[0];
+  function ye(e) {
+    for (var t = 0; t < V.length; t++) if (e >= V[t].from && e <= V[t].to) return V[t];
+    return V[0];
   }
-
-  function Synth() {
-    this.ctx = null;
-    this.noise = null;
-    this.master = null;
-    this.voices = [];
-    this.ch = [];
-    for (var i = 0; i < 16; i++) {
-      this.ch.push({ prog: 0, vol: 100, expr: 127, bend: 0, sustain: false });
-    }
+  function m() {
+    ((this.ctx = null),
+      (this.noise = null),
+      (this.master = null),
+      (this.voices = []),
+      (this.ch = []));
+    for (var e = 0; e < 16; e++)
+      this.ch.push({ prog: 0, vol: 100, expr: 127, bend: 0, sustain: !1 });
   }
-  Synth.prototype.ensure = function () {
+  ((m.prototype.ensure = function () {
     if (this.ctx) return this.ctx;
-    var C = window.AudioContext || window.webkitAudioContext;
-    if (!C) return null;
-    try { this.ctx = new C(); } catch (e) { this.ctx = null; }
-    if (this.ctx && this.ctx.createGain) {
-      this.master = this.ctx.createGain();
-      this.master.gain.value = 0.9;
-      this.master.connect(this.ctx.destination);
+    var e = window.AudioContext || window.webkitAudioContext;
+    if (!e) return null;
+    try {
+      this.ctx = new e();
+    } catch (u) {
+      this.ctx = null;
     }
-    if (this.ctx && this.ctx.createBuffer) {
-      var len = this.ctx.sampleRate;
-      var buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
-      var data = buf.getChannelData(0);
-      for (var i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
-      this.noise = buf;
+    if (
+      (this.ctx &&
+        this.ctx.createGain &&
+        ((this.master = this.ctx.createGain()),
+        (this.master.gain.value = 0.9),
+        this.master.connect(this.ctx.destination)),
+      this.ctx && this.ctx.createBuffer)
+    ) {
+      for (
+        var t = this.ctx.sampleRate,
+          r = this.ctx.createBuffer(1, t, this.ctx.sampleRate),
+          s = r.getChannelData(0),
+          a = 0;
+        a < t;
+        a++
+      )
+        s[a] = Math.random() * 2 - 1;
+      this.noise = r;
     }
     return this.ctx;
-  };
-  Synth.prototype.stopVoice = function (v) {
-    try { v.src.stop(); } catch (e) {}
-  };
-  Synth.prototype.busy = function () {
-    return this.voices.length >= 48;
-  };
-  Synth.prototype.addVoice = function (v) {
-    this.voices.push(v);
-  };
-  Synth.prototype.cleanup = function (now) {
-    var keep = [];
-    for (var i = 0; i < this.voices.length; i++) {
-      if (this.voices[i].end > now) keep.push(this.voices[i]);
-    }
-    this.voices = keep;
-  };
-  Synth.prototype.noteOn = function (ev, when, dur) {
-    var c = this.ensure();
-    if (!c || this.busy()) return;
-    var st = this.ch[ev.ch];
-    var vel = ev.vel / 127;
-    var level = vel * (st.vol / 127) * (st.expr / 127);
-    if (ev.ch === 9) { this.drum(ev.note, when, level * 0.5); return; }
-    var fam = familyFor(st.prog);
-    var freq = 440 * Math.pow(2, (ev.note - 69 + st.bend) / 12);
-    var osc = c.createOscillator();
-    var gain = c.createGain();
-    osc.type = fam.wave;
-    osc.frequency.value = freq;
-    osc.connect(gain);
-    gain.connect(this.master || c.destination);
-    var peak = level * 0.22;
-    var end = when + dur + fam.r;
-    var atkEnd = when + Math.min(fam.a, dur);
-    var decEnd = when + Math.min(fam.a + fam.d, dur);
-    gain.gain.setValueAtTime(0.0001, when);
-    gain.gain.linearRampToValueAtTime(peak, atkEnd);
-    gain.gain.linearRampToValueAtTime(Math.max(peak * fam.s, 0.0001), decEnd);
-    gain.gain.setValueAtTime(Math.max(peak * fam.s, 0.0001), when + dur);
-    gain.gain.exponentialRampToValueAtTime(0.0001, end);
-    osc.start(when);
-    osc.stop(end + 0.02);
-    this.addVoice({ src: osc, end: end + 0.02 });
-  };
-  Synth.prototype.drum = function (note, when, level) {
-    var c = this.ctx;
-    var gain = c.createGain();
-    gain.connect(this.master || c.destination);
-    var len = 0.2;
-    var src, filt;
-    if (note === 35 || note === 36) {
-      // kick: sine with pitch drop
-      var k = c.createOscillator();
-      k.type = "sine";
-      k.frequency.setValueAtTime(150, when);
-      k.frequency.exponentialRampToValueAtTime(45, when + 0.12);
-      k.connect(gain);
-      gain.gain.setValueAtTime(level * 0.9, when);
-      gain.gain.exponentialRampToValueAtTime(0.001, when + 0.25);
-      k.start(when); k.stop(when + 0.26);
-      this.addVoice({ src: k, end: when + 0.27 });
-      return;
-    }
-    if (!this.noise) return;
-    src = c.createBufferSource();
-    src.buffer = this.noise;
-    filt = c.createBiquadFilter();
-    if (note === 38 || note === 40) { filt.type = "highpass"; filt.frequency.value = 1200; len = 0.18; }
-    else if (note === 42 || note === 44) { filt.type = "highpass"; filt.frequency.value = 7000; len = 0.05; }
-    else if (note === 46) { filt.type = "highpass"; filt.frequency.value = 7000; len = 0.25; }
-    else if (note >= 49 && note <= 59) { filt.type = "highpass"; filt.frequency.value = 5000; len = 0.7; }
-    else if (note >= 41 && note <= 50) { filt.type = "lowpass"; filt.frequency.value = 900; len = 0.25; }
-    else { filt.type = "highpass"; filt.frequency.value = 2000; len = 0.1; }
-    src.connect(filt);
-    filt.connect(gain);
-    gain.gain.setValueAtTime(level, when);
-    gain.gain.exponentialRampToValueAtTime(0.0001, when + len);
-    src.start(when, Math.random() * 0.5);
-    src.stop(when + len + 0.02);
-    this.addVoice({ src: src, end: when + len + 0.02 });
-  };
-  Synth.prototype.silence = function () {
-    for (var i = 0; i < this.voices.length; i++) this.stopVoice(this.voices[i]);
-    this.voices = [];
-  };
-
-  // Player: schedules events a little ahead of the audio clock.
-  function MidiPlayer(synth) {
-    this.synth = synth;
-    this.events = [];
-    this.duration = 0;
-    this.idx = 0;
-    this.shift = 0;
-    this.startAt = 0;
-    this.timer = null;
-    this.playing = false;
-    this.loop = false;
-  }
-  MidiPlayer.prototype.prepare = function (parsed) {
-    var ev = parsed.events;
-    var open = {}, sustain = {}, held = {}, i, e, key;
-    function close(on, t) {
-      on.dur = Math.max(0.03, Math.min(t - on.t, 8));
-    }
-    for (i = 0; i < ev.length; i++) {
-      e = ev[i];
-      if (e.kind === "on") {
-        key = e.ch * 128 + e.note;
-        if (open[key]) close(open[key], e.t);
-        open[key] = e;
-        e.dur = 1;
-      } else if (e.kind === "off") {
-        key = e.ch * 128 + e.note;
-        if (sustain[e.ch]) {
-          (held[e.ch] = held[e.ch] || []).push(key);
-        } else if (open[key]) {
-          close(open[key], e.t);
-          delete open[key];
+  }),
+    (m.prototype.stopVoice = function (e) {
+      try {
+        e.src.stop();
+      } catch (t) {}
+    }),
+    (m.prototype.busy = function () {
+      return this.voices.length >= 48;
+    }),
+    (m.prototype.addVoice = function (e) {
+      this.voices.push(e);
+    }),
+    (m.prototype.cleanup = function (e) {
+      for (var t = [], r = 0; r < this.voices.length; r++) {
+        var q = this.voices[r];
+        q.end > e ? t.push(q) : q.gain && q.gain.disconnect && q.gain.disconnect();
+      }
+      this.voices = t;
+    }),
+    (m.prototype.noteOn = function (e, t, r) {
+      var s = this.ensure();
+      if (!(!s || this.busy())) {
+        var a = this.ch[e.ch],
+          u = e.vel / 127,
+          i = u * (a.vol / 127) * (a.expr / 127);
+        if (e.ch === 9) {
+          this.drum(e.note, t, i * 0.5);
+          return;
         }
-      } else if (e.kind === "cc" && e.cc === 64) {
-        sustain[e.ch] = e.val >= 64;
-        if (!sustain[e.ch] && held[e.ch]) {
-          for (var h = 0; h < held[e.ch].length; h++) {
-            var k2 = held[e.ch][h];
-            if (open[k2]) { close(open[k2], e.t); delete open[k2]; }
+        var n = ye(a.prog),
+          o = 440 * Math.pow(2, (e.note - 69 + a.bend) / 12),
+          c = s.createOscillator(),
+          h = s.createGain();
+        ((c.type = n.wave),
+          (c.frequency.value = o),
+          c.connect(h),
+          h.connect(this.master || s.destination));
+        var w = i * 0.22,
+          A = t + r + n.r,
+          g = t + Math.min(n.a, r),
+          l = t + Math.min(n.a + n.d, r);
+        (h.gain.setValueAtTime(1e-4, t),
+          h.gain.linearRampToValueAtTime(w, g),
+          h.gain.linearRampToValueAtTime(Math.max(w * n.s, 1e-4), l),
+          h.gain.setValueAtTime(Math.max(w * n.s, 1e-4), t + r),
+          h.gain.exponentialRampToValueAtTime(1e-4, A),
+          c.start(t),
+          c.stop(A + 0.02),
+          this.addVoice({ src: c, gain: h, end: A + 0.02 }));
+      }
+    }),
+    (m.prototype.drum = function (e, t, r) {
+      var s = this.ctx,
+        a = s.createGain();
+      a.connect(this.master || s.destination);
+      var u = 0.2,
+        i,
+        n;
+      if (e === 35 || e === 36) {
+        var o = s.createOscillator();
+        ((o.type = "sine"),
+          o.frequency.setValueAtTime(150, t),
+          o.frequency.exponentialRampToValueAtTime(45, t + 0.12),
+          o.connect(a),
+          a.gain.setValueAtTime(r * 0.9, t),
+          a.gain.exponentialRampToValueAtTime(0.001, t + 0.25),
+          o.start(t),
+          o.stop(t + 0.26),
+          this.addVoice({ src: o, gain: a, end: t + 0.27 }));
+        return;
+      }
+      this.noise &&
+        ((i = s.createBufferSource()),
+        (i.buffer = this.noise),
+        (n = s.createBiquadFilter()),
+        e === 38 || e === 40
+          ? ((n.type = "highpass"), (n.frequency.value = 1200), (u = 0.18))
+          : e === 42 || e === 44
+            ? ((n.type = "highpass"), (n.frequency.value = 7e3), (u = 0.05))
+            : e === 46
+              ? ((n.type = "highpass"), (n.frequency.value = 7e3), (u = 0.25))
+              : e >= 49 && e <= 59
+                ? ((n.type = "highpass"), (n.frequency.value = 5e3), (u = 0.7))
+                : e >= 41 && e <= 50
+                  ? ((n.type = "lowpass"), (n.frequency.value = 900), (u = 0.25))
+                  : ((n.type = "highpass"), (n.frequency.value = 2e3), (u = 0.1)),
+        i.connect(n),
+        n.connect(a),
+        a.gain.setValueAtTime(r, t),
+        a.gain.exponentialRampToValueAtTime(1e-4, t + u),
+        i.start(t, Math.random() * 0.5),
+        i.stop(t + u + 0.02),
+        this.addVoice({ src: i, gain: a, end: t + u + 0.02 }));
+    }),
+    (m.prototype.silence = function () {
+      for (var e = 0; e < this.voices.length; e++) {
+        this.stopVoice(this.voices[e]);
+        var q = this.voices[e].gain;
+        q && q.disconnect && q.disconnect();
+      }
+      this.voices = [];
+    }));
+  function y(e) {
+    ((this.synth = e),
+      (this.events = []),
+      (this.duration = 0),
+      (this.idx = 0),
+      (this.shift = 0),
+      (this.startAt = 0),
+      (this.timer = null),
+      (this.playing = !1),
+      (this.loop = !1));
+  }
+  ((y.prototype.prepare = function (e) {
+    var t = e.events,
+      r = {},
+      s = {},
+      a = {},
+      u,
+      i,
+      n;
+    function o(w, A) {
+      w.dur = Math.max(0.03, Math.min(A - w.t, 8));
+    }
+    for (u = 0; u < t.length; u++)
+      if (((i = t[u]), i.kind === "on"))
+        ((n = i.ch * 128 + i.note), r[n] && o(r[n], i.t), (r[n] = i), (i.dur = 1));
+      else if (i.kind === "off")
+        ((n = i.ch * 128 + i.note),
+          s[i.ch] ? (a[i.ch] = a[i.ch] || []).push(n) : r[n] && (o(r[n], i.t), delete r[n]));
+      else if (i.kind === "cc" && i.cc === 64 && ((s[i.ch] = i.val >= 64), !s[i.ch] && a[i.ch])) {
+        for (var c = 0; c < a[i.ch].length; c++) {
+          var h = a[i.ch][c];
+          r[h] && (o(r[h], i.t), delete r[h]);
+        }
+        a[i.ch] = [];
+      }
+    for (n in r) r.hasOwnProperty(n) && o(r[n], r[n].t + 1);
+    ((this.events = t),
+      (this.duration = Math.max(e.duration, t.length ? t[t.length - 1].t + 1 : 0)));
+  }),
+    (y.prototype.play = function (e, t) {
+      var r = me(new Uint8Array(e));
+      if (
+        r &&
+        (this.stop(),
+        this.prepare(r),
+        !!this.events.length && ((this.loop = X && !!t), this.synth.ensure(), !!this.synth.ctx))
+      ) {
+        (this.resetChannels(),
+          (this.idx = 0),
+          (this.shift = 0),
+          (this.startAt = this.synth.ctx.currentTime + 0.1),
+          (this.playing = !0));
+        var s = this;
+        (this.schedule(),
+          (this.timer = setInterval(function () {
+            s.schedule();
+          }, 100)));
+      }
+    }),
+    (y.prototype.resetChannels = function () {
+      for (var e = 0; e < 16; e++) {
+        var t = this.synth.ch[e];
+        ((t.prog = 0), (t.vol = 100), (t.expr = 127), (t.bend = 0), (t.sustain = !1));
+      }
+    }),
+    (y.prototype.apply = function (e, t) {
+      var r = this.synth.ch[e.ch];
+      e.kind === "prog"
+        ? (r.prog = e.val)
+        : e.kind === "bend"
+          ? (r.bend = (e.val / 8192) * 2)
+          : e.kind === "cc" &&
+            (e.cc === 7
+              ? (r.vol = e.val)
+              : e.cc === 11
+                ? (r.expr = e.val)
+                : e.cc === 64
+                  ? (r.sustain = e.val >= 64)
+                  : (e.cc === 120 || e.cc === 123) && this.synth.silence());
+    }),
+    (y.prototype.schedule = function () {
+      var e = this.synth.ctx;
+      if (!(!e || !this.playing)) {
+        for (var t = e.currentTime + 3, r = 0; r++ < 5e3; ) {
+          if (this.idx >= this.events.length) {
+            if (!this.loop) break;
+            ((this.shift += this.duration), (this.idx = 0), this.resetChannels());
           }
-          held[e.ch] = [];
+          var s = this.events[this.idx],
+            a = this.startAt + this.shift + s.t;
+          if (a > t) break;
+          (s.kind === "on"
+            ? a >= e.currentTime - 0.5 && this.synth.noteOn(s, Math.max(a, e.currentTime), s.dur)
+            : this.apply(s, a),
+            this.idx++);
         }
+        (this.synth.cleanup(e.currentTime),
+          !this.loop &&
+            this.idx >= this.events.length &&
+            e.currentTime > this.startAt + this.duration + 1 &&
+            this.stop());
       }
-    }
-    for (key in open) { if (open.hasOwnProperty(key)) close(open[key], open[key].t + 1); }
-    this.events = ev;
-    this.duration = Math.max(parsed.duration, ev.length ? ev[ev.length - 1].t + 1 : 0);
-  };
-  MidiPlayer.prototype.play = function (bytes, loopFlag) {
-    var parsed = parseMidi(new Uint8Array(bytes));
-    if (!parsed) return;
-    this.stop();
-    this.prepare(parsed);
-    if (!this.events.length) return;
-    this.loop = allowLoop && !!loopFlag;
-    this.synth.ensure();
-    if (!this.synth.ctx) return;
-    this.resetChannels();
-    this.idx = 0;
-    this.shift = 0;
-    this.startAt = this.synth.ctx.currentTime + 0.1;
-    this.playing = true;
-    var self = this;
-    this.schedule();
-    this.timer = setInterval(function () { self.schedule(); }, 100);
-  };
-  MidiPlayer.prototype.resetChannels = function () {
-    for (var i = 0; i < 16; i++) {
-      var st = this.synth.ch[i];
-      st.prog = 0; st.vol = 100; st.expr = 127; st.bend = 0; st.sustain = false;
-    }
-  };
-  MidiPlayer.prototype.apply = function (e, when) {
-    var st = this.synth.ch[e.ch];
-    if (e.kind === "prog") st.prog = e.val;
-    else if (e.kind === "bend") st.bend = (e.val / 8192) * 2;
-    else if (e.kind === "cc") {
-      if (e.cc === 7) st.vol = e.val;
-      else if (e.cc === 11) st.expr = e.val;
-      else if (e.cc === 64) st.sustain = e.val >= 64;
-      else if (e.cc === 120 || e.cc === 123) this.synth.silence();
-    }
-  };
-  MidiPlayer.prototype.schedule = function () {
-    var c = this.synth.ctx;
-    if (!c || !this.playing) return;
-    var horizon = c.currentTime + 3.0;
-    var guard = 0;
-    while (guard++ < 5000) {
-      if (this.idx >= this.events.length) {
-        if (!this.loop) break;
-        this.shift += this.duration;
-        this.idx = 0;
-        this.resetChannels();
-      }
-      var e = this.events[this.idx];
-      var when = this.startAt + this.shift + e.t;
-      if (when > horizon) break;
-      if (e.kind === "on") {
-        if (when >= c.currentTime - 0.5) this.synth.noteOn(e, Math.max(when, c.currentTime), e.dur);
-      } else {
-        this.apply(e, when);
-      }
-      this.idx++;
-    }
-    this.synth.cleanup(c.currentTime);
-    if (!this.loop && this.idx >= this.events.length && c.currentTime > this.startAt + this.duration + 1) {
-      this.stop();
-    }
-  };
-  MidiPlayer.prototype.stop = function () {
-    this.playing = false;
-    if (this.timer) { clearInterval(this.timer); this.timer = null; }
-    this.synth.silence();
-    this.events = [];
-  };
-  MidiPlayer.prototype.pause = function () {
-    if (this.synth.ctx && this.synth.ctx.suspend) this.synth.ctx.suspend();
-  };
-  MidiPlayer.prototype.resume = function () {
-    if (this.synth.ctx && this.synth.ctx.resume) this.synth.ctx.resume();
-  };
-
-  // ---------- sampled audio (WAV, MP3, OGG, ...) via <audio> ----------
-  var audioEl = null, audioUrl = null;
-  function sniffMime(b) {
-    if (b.length >= 4 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46) return "audio/wav";  // RIFF
-    if (b.length >= 4 && b[0] === 0x4F && b[1] === 0x67 && b[2] === 0x67 && b[3] === 0x53) return "audio/ogg";  // OggS
-    if (b.length >= 3 && b[0] === 0x49 && b[1] === 0x44 && b[2] === 0x33) return "audio/mpeg";                 // ID3
-    if (b.length >= 2 && b[0] === 0xFF && (b[1] & 0xE0) === 0xE0) return "audio/mpeg";                         // MP3 frame
-    if (b.length >= 5 && b[0] === 0x23 && b[1] === 0x21 && b[2] === 0x41 && b[3] === 0x4D && b[4] === 0x52) return "audio/amr"; // #!AMR
-    if (b.length >= 4 && b[0] === 0x66 && b[1] === 0x4C && b[2] === 0x61 && b[3] === 0x43) return "audio/flac"; // fLaC
-    return "audio/mpeg";
+    }),
+    (y.prototype.stop = function () {
+      ((this.playing = !1),
+        this.timer && (clearInterval(this.timer), (this.timer = null)),
+        this.synth.silence(),
+        (this.events = []));
+    }),
+    (y.prototype.pause = function () {
+      this.synth.ctx && this.synth.ctx.suspend && this.synth.ctx.suspend();
+    }),
+    (y.prototype.resume = function () {
+      this.synth.ctx && this.synth.ctx.resume && this.synth.ctx.resume();
+    }));
+  var d = null,
+    U = null;
+  function ge(e) {
+    return e.length >= 4 && e[0] === 82 && e[1] === 73 && e[2] === 70 && e[3] === 70
+      ? "audio/wav"
+      : e.length >= 4 && e[0] === 79 && e[1] === 103 && e[2] === 103 && e[3] === 83
+        ? "audio/ogg"
+        : (e.length >= 3 && e[0] === 73 && e[1] === 68 && e[2] === 51) ||
+            (e.length >= 2 && e[0] === 255 && (e[1] & 224) === 224)
+          ? "audio/mpeg"
+          : e.length >= 5 && e[0] === 35 && e[1] === 33 && e[2] === 65 && e[3] === 77 && e[4] === 82
+            ? "audio/amr"
+            : e.length >= 4 && e[0] === 102 && e[1] === 76 && e[2] === 97 && e[3] === 67
+              ? "audio/flac"
+              : "audio/mpeg";
   }
-  function stopSampled() {
-    if (audioEl) {
-      try { audioEl.pause(); } catch (e) {}
-      audioEl = null;
-    }
-    if (audioUrl) {
-      try { URL.revokeObjectURL(audioUrl); } catch (e) {}
-      audioUrl = null;
-    }
-  }
-  function playSampled(bytes, loopFlag) {
-    stopSampled();
-    var b = new Uint8Array(bytes);
-    var mime = sniffMime(b);
-    var canPlay = (new Audio()).canPlayType ? (new Audio()).canPlayType(mime) : "";
-    if (!canPlay) {
-      showStatus("This device cannot play " + mime + " sound.", true);
-      return;
-    }
-    var blob = new Blob([b], { type: mime });
-    audioUrl = URL.createObjectURL(blob);
-    audioEl = new Audio(audioUrl);
-    audioEl.loop = allowLoop && !!loopFlag;
-    var p = audioEl.play();
-    if (p && p.catch) p.catch(function (e) { showStatus("Sound blocked: press any key, then it will play. (" + errText(e) + ")", true); });
-  }
-
-  // ---------- engine worker ----------
-  var synth = new Synth();
-  var midi = new MidiPlayer(synth);
-  var worker = null;
-  var closed = false;
-  var lastFault = null;
-
-  // Frames are coalesced: only the newest frame is drawn, once per display refresh.
-  // Older frames are returned to the worker at once, so the worker never stalls.
-  var pendingFrame = null;
-  var frameQueued = false;
-  var exitRequested = false;
-  function recycleFrame(px) {
-    if (worker && px) worker.postMessage({ type: "recycle", px: px }, [px.buffer]);
-  }
-  function onFrame(d) {
-    if (d.exit) exitRequested = true;
-    if (pendingFrame) recycleFrame(pendingFrame.px);
-    pendingFrame = d;
-    if (!frameQueued) {
-      frameQueued = true;
-      if (window.requestAnimationFrame) requestAnimationFrame(presentFrame);
-      else setTimeout(presentFrame, 16);
-    }
-  }
-  function presentFrame() {
-    frameQueued = false;
-    var d = pendingFrame;
-    pendingFrame = null;
+  function H() {
     if (d) {
-      drawFrame(d.px);
-      recycleFrame(d.px);
+      try {
+        d.pause();
+      } catch (e) {}
+      d = null;
     }
-    if (exitRequested) finish();
+    if (U) {
+      try {
+        URL.revokeObjectURL(U);
+      } catch (e) {}
+      U = null;
+    }
   }
-  function finish() {
-    if (closed) return;
-    closed = true;
-    midi.stop();
-    stopSampled();
-    if (worker) { try { worker.terminate(); } catch (e) {} worker = null; }
-    try { window.close(); } catch (e) {}
-    setTimeout(function () { showStatus("Game closed.", false); }, 600);
-  }
-  function onWorkerMessage(e) {
-    var d = e.data;
-    if (d.type === "frame") { onFrame(d); return; }
-    if (d.type === "boot") {
-      if (d.result && d.result.ok) showStatus("", false);
-      else showStatus("Game did not start: " + ((d.result && d.result.message) || "unknown error"), true);
+  function xe(e, t) {
+    H();
+    var r = new Uint8Array(e),
+      s = ge(r),
+      q = new Audio(),
+      a = q.canPlayType ? q.canPlayType(s) : "";
+    if (!a) {
+      p("This device cannot play " + s + " sound.", !0);
       return;
     }
-    if (d.type === "log") {
-      if (d.level === "warn" || d.level === "error") showStatus(d.text, d.level === "error");
+    var u = new Blob([r], { type: s });
+    ((U = URL.createObjectURL(u)), (d = new Audio(U)), (d.loop = X && !!t));
+    var i = d.play();
+    i &&
+      i.catch &&
+      i.catch(function (n) {
+        p("Sound blocked: press any key, then it will play. (" + S(n) + ")", !0);
+      });
+  }
+  var L = new m(),
+    T = new y(L),
+    v = null,
+    re = !1,
+    Ee = null,
+    B = null,
+    K = !1,
+    ie = !1;
+  function ne(e) {
+    v && e && v.postMessage({ type: "recycle", px: e }, [e.buffer]);
+  }
+  function we(e) {
+    (e.exit && (ie = !0),
+      B && ne(B.px),
+      (B = e),
+      K ||
+        ((K = !0), window.requestAnimationFrame ? requestAnimationFrame(ae) : setTimeout(ae, 16)));
+  }
+  function ae() {
+    K = !1;
+    var e = B;
+    ((B = null), e && (de(e.px), ne(e.px)), ie && ke());
+  }
+  function ke() {
+    if (!re) {
+      if (((re = !0), T.stop(), H(), v)) {
+        try {
+          v.terminate();
+        } catch (e) {}
+        v = null;
+      }
+      try {
+        window.close();
+      } catch (e) {}
+      setTimeout(function () {
+        p("Game closed. Press the back key to return to the menu.", !1);
+      }, 600);
+    }
+  }
+  function Te(e) {
+    var t = e.data;
+    if (t.type === "frame") {
+      we(t);
       return;
     }
-    if (d.type === "midi") midi.play(d.bytes, d.loop);
-    else if (d.type === "midi-stop") midi.stop();
-    else if (d.type === "midi-pause") midi.pause();
-    else if (d.type === "midi-resume") midi.resume();
-    else if (d.type === "audio") playSampled(d.bytes, d.loop);
-    else if (d.type === "audio-stop") stopSampled();
-    else if (d.type === "audio-pause") { if (audioEl) audioEl.pause(); }
-    else if (d.type === "audio-resume") { if (audioEl) audioEl.play(); }
+    if (t.type === "boot") {
+      t.result && t.result.ok
+        ? p("", !1)
+        : p("Game did not start: " + ((t.result && t.result.message) || "unknown error"), !0);
+      return;
+    }
+    if (t.type === "log") {
+      (t.level === "warn" || t.level === "error") && p(t.text, t.level === "error");
+      return;
+    }
+    t.type === "midi"
+      ? T.play(t.bytes, t.loop)
+      : t.type === "midi-stop"
+        ? T.stop()
+        : t.type === "midi-pause"
+          ? T.pause()
+          : t.type === "midi-resume"
+            ? T.resume()
+            : t.type === "audio"
+              ? xe(t.bytes, t.loop)
+              : t.type === "audio-stop"
+                ? H()
+                : t.type === "audio-pause"
+                  ? d && d.pause()
+                  : t.type === "audio-resume" && d && d.play();
   }
-  function onWorkerError(e) {
-    var where = (e.filename ? " (" + e.filename + ":" + e.lineno + ")" : "");
-    showStatus("Engine error: " + (e.message || "script failed to load") + where, true);
+  function Ae(e) {
+    var t = e.filename ? " (" + e.filename + ":" + e.lineno + ")" : "";
+    p("Engine error: " + (e.message || "script failed to load") + t, !0);
   }
-  function startEngine(bytes) {
+  function Me(e) {
     if (!window.Worker) {
-      showStatus("This device cannot run the engine (Web Workers are not supported).", true);
+      p("This device cannot run the engine (Web Workers are not supported).", !0);
       return;
     }
     try {
-      worker = new Worker("engine.js");
-    } catch (e) {
-      showStatus("Cannot start engine: " + errText(e), true);
+      v = new Worker("engine.js");
+    } catch (t) {
+      p("Cannot start engine: " + S(t), !0);
       return;
     }
-    worker.onmessage = onWorkerMessage;
-    worker.onerror = onWorkerError;
+    ((v.onmessage = Te), (v.onerror = Ae));
     try {
-      worker.postMessage({ type: "load", bytes: bytes, name: "game.vxp", charset: textCharset }, [bytes]);
-    } catch (e) {
-      showStatus("Cannot send the game to the engine: " + errText(e), true);
+      v.postMessage({ type: "load", bytes: e, name: "game.vxp", charset: pe }, [e]);
+    } catch (t) {
+      p("Cannot send the game to the engine: " + S(t), !0);
     }
   }
-
-  // ---------- load the game: ?vxp=URL, otherwise game.vxp in the package ----------
-  var vxpUrl = getParam("vxp");
-  showStatus("Loading game...", false);
-  var source = vxpUrl ? vxpUrl : "game.vxp";
-  fetch(source).then(function (r) {
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    return r.arrayBuffer();
-  }).then(function (buf) {
-    startEngine(buf);
-  }, function (e) {
-    if (vxpUrl) {
-      showStatus("Cannot download the game from the link (" + errText(e) + "). The server must allow CORS, or put the file into the app as game.vxp.", true);
-    } else {
-      showStatus("game.vxp not found. Put the game file named game.vxp in the app package root. (" + errText(e) + ")", true);
-    }
-  });
-
-  // ---------- keys ----------
-  var KEY_CODES = {
-    "up": -1, "down": -2, "left": -3, "right": -4, "ok": -5,
-    "soft-left": -6, "soft-right": -7, "end": -9, "*": 42, "#": 35
-  };
-  var KEY_NAMES = {
-    ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", Enter: "ok",
-    SoftLeft: "soft-left", SoftRight: "soft-right", F1: "soft-left", F2: "soft-right",
-    Backspace: "soft-right", EndCall: "end", Escape: "end", Call: "soft-left", "*": "*", "#": "#"
-  };
-  for (var n = 0; n <= 9; n++) {
-    KEY_NAMES[String(n)] = String(n);
-    KEY_CODES[String(n)] = 48 + n;
+  var j = G("vxp");
+  p("Loading game...", !1);
+  var Fe = j || "game.vxp";
+  fetch(Fe)
+    .then(function (e) {
+      if (!e.ok) throw new Error("HTTP " + e.status);
+      return e.arrayBuffer();
+    })
+    .then(
+      function (e) {
+        Me(e);
+      },
+      function (e) {
+        p(
+          j
+            ? "Cannot download the game from the link (" +
+                S(e) +
+                "). The server must allow CORS, or put the file into the app as game.vxp."
+            : "game.vxp not found. Put the game file named game.vxp in the app package root. (" +
+                S(e) +
+                ")",
+          !0
+        );
+      }
+    );
+  for (
+    var z = {
+        up: -1,
+        down: -2,
+        left: -3,
+        right: -4,
+        ok: -5,
+        "soft-left": -6,
+        "soft-right": -7,
+        end: -9,
+        "*": 42,
+        "#": 35,
+      },
+      N = {
+        ArrowUp: "up",
+        ArrowDown: "down",
+        ArrowLeft: "left",
+        ArrowRight: "right",
+        Enter: "ok",
+        SoftLeft: "soft-left",
+        SoftRight: "soft-right",
+        F1: "soft-left",
+        F2: "soft-right",
+        Backspace: "soft-right",
+        EndCall: "end",
+        Escape: "end",
+        Call: "soft-left",
+        "*": "*",
+        "#": "#",
+      },
+      E = 0;
+    E <= 9;
+    E++
+  )
+    ((N[String(E)] = String(E)), (z[String(E)] = 48 + E));
+  function se(e, t) {
+    v && v.postMessage({ type: "key", ev: e, code: t });
   }
-  function sendKey(ev, code) {
-    if (worker) worker.postMessage({ type: "key", ev: ev, code: code });
-  }
-  document.addEventListener("keydown", function (e) {
-    var name = KEY_NAMES[e.key];
-    synth.ensure();
-    if (synth.ctx && synth.ctx.resume) synth.ctx.resume();
-    if (name) { e.preventDefault(); if (!e.repeat) sendKey(2, KEY_CODES[name]); }
-  });
-  document.addEventListener("keyup", function (e) {
-    var name = KEY_NAMES[e.key];
-    if (name) { e.preventDefault(); sendKey(1, KEY_CODES[name]); }
-  });
-  document.addEventListener("visibilitychange", function () {
-    if (worker) worker.postMessage({ type: "running", value: !document.hidden });
-    if (document.hidden) midi.pause(); else midi.resume();
-  });
+  (document.addEventListener("keydown", function (e) {
+    var t = N[e.key];
+    (L.ensure(),
+      L.ctx && L.ctx.resume && L.ctx.resume(),
+      t && (e.preventDefault(), e.repeat || se(2, z[t])));
+  }),
+    document.addEventListener("keyup", function (e) {
+      var t = N[e.key];
+      t && (e.preventDefault(), se(1, z[t]));
+    }),
+    document.addEventListener("visibilitychange", function () {
+      (v && v.postMessage({ type: "running", value: !document.hidden }),
+        document.hidden ? T.pause() : T.resume());
+    }));
 })();
 </script>
 </body>

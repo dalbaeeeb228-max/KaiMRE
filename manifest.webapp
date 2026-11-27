@@ -1,6 +1,6 @@
 {
   "name": "KaiMRE",
-  "description": "Runs MRE/VXP games from game.vxp in the package or from a link",
+  "description": "Runs MRE/VXP games from the game.vxp file in the package",
   "version": "1.0.0",
   "launch_path": "/index.html",
   "developer": {
@@ -12,5 +12,11 @@
     "64": "/icons/icon64.png",
     "128": "/icons/icon128.png"
   },
-  "permissions": {}
+  "permissions": {
+    "device-storage:sdcard": {
+      "access": "readonly",
+      "description": "To find .vxp games on the SD card"
+    }
+  },
+  "type": "privileged"
 }

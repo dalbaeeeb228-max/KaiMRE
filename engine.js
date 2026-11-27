@@ -9174,7 +9174,7 @@ var v_2 = Object.defineProperty,
           arg_3235({
             type: "log",
             level: "warn",
-            text: `Guest dung lai: ${v_3250.kind}@0x${(v_3250.pc >>> 0).toString(16)}`,
+            text: `Guest stopped: ${v_3250.kind}@0x${(v_3250.pc >>> 0).toString(16)}${v_3250.detail ? " - " + v_3250.detail : ""}`,
           })),
           arg_3235(
             {
