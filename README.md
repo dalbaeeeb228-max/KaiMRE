@@ -14,7 +14,7 @@ License: Apache License 2.0 (see [LICENSE](LICENSE)).
 
 KaiMRE is a small runtime that plays MRE/VXP games (the Mobile Runtime Environment format used by old feature phones) on KaiOS 2.5 devices. It is a web app: an ARM/VXP interpreter runs in a Web Worker, and the page draws the screen and handles keys and sound.
 
-All source code is open and readable. Nothing is minified or obfuscated.
+The emulator runs in two parts: `index.html` handles the screen, the sound and the keys, and `engine.js` executes the game code. The engine implements the VXP/ARM instructions, the MRE system calls used by the games (graphics, timers, keys, sound, files) and the text decoding (UTF-8 and Windows-1251).
 
 ### Files
 
@@ -56,7 +56,7 @@ Zip the files with `index.html` at the root of the archive, then install the arc
 
 ### Contributing
 
-Issues and pull requests are welcome. Keep the code readable: no minification and no obfuscation, and ES2015 syntax at most in `engine.js` (KaiOS 2.5 uses Gecko 48).
+Issues and pull requests are welcome. `engine.js` must use ES2015 syntax at most, because KaiOS 2.5 uses Gecko 48.
 
 ---
 
@@ -66,7 +66,7 @@ Issues and pull requests are welcome. Keep the code readable: no minification an
 
 KaiMRE — небольшой движок, который запускает игры MRE/VXP (формат Mobile Runtime Environment, которым пользовались старые кнопочные телефоны) на устройствах KaiOS 2.5. Это веб-приложение: интерпретатор VXP/ARM работает в Web Worker, а страница рисует экран и обрабатывает клавиши и звук.
 
-Весь исходный код открыт и читаем. Ничего не минифицировано и не обфусцировано.
+Эмулятор работает в две части: `index.html` отвечает за экран, звук и клавиши, а `engine.js` выполняет код игры. Движок реализует инструкции VXP/ARM, системные вызовы MRE, которые используют игры (графика, таймеры, клавиши, звук, файлы), и декодирование текста (UTF-8 и Windows-1251).
 
 ### Файлы
 
@@ -108,4 +108,4 @@ KaiMRE — небольшой движок, который запускает и
 
 ### Участие в проекте
 
-Сообщения об ошибках и pull request'ы приветствуются. Держите код читаемым: без минификации и обфускации, а в `engine.js` не выходите за синтаксис ES2015 (KaiOS 2.5 использует Gecko 48).
+Сообщения об ошибках и pull request'ы приветствуются. В `engine.js` используйте синтаксис не выше ES2015, потому что KaiOS 2.5 работает на Gecko 48.
