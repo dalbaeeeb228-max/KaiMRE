@@ -1,111 +1,161 @@
 # KaiMRE
 
-KaiMRE runs MRE/VXP games in the browser of KaiOS 2.5 phones.
-KaiMRE запускает игры MRE/VXP в браузере телефонов на KaiOS 2.5.
+**KaiMRE** is an emulator that runs MRE/VXP games on KaiOS 2.5 phones.
+**KaiMRE** — эмулятор, который запускает игры MRE/VXP на телефонах KaiOS 2.5.
 
-License: Apache License 2.0 (see [LICENSE](LICENSE)).
-Лицензия: Apache License 2.0 (см. [LICENSE](LICENSE)).
+MRE (Mobile Runtime Environment) was the platform behind many games on old feature phones. KaiMRE brings those games to KaiOS, which runs in the Firefox engine (Gecko 48), using only the browser.
+
+MRE (Mobile Runtime Environment) — платформа, для которой выходило много игр на старых кнопочных телефонах. KaiMRE переносит эти игры на KaiOS, которая работает на движке Firefox (Gecko 48), и использует только браузер телефона.
+
+License: Apache License 2.0. See [LICENSE](LICENSE).
+Лицензия: Apache License 2.0. См. [LICENSE](LICENSE).
 
 ---
 
 ## English
 
-### What it is
+### Features
 
-KaiMRE is a small runtime that plays MRE/VXP games (the Mobile Runtime Environment format used by old feature phones) on KaiOS 2.5 devices. It is a web app: an ARM/VXP interpreter runs in a Web Worker, and the page draws the screen and handles keys and sound.
+- Runs `.vxp` (MRE) games on KaiOS 2.5 devices.
+- Scales the game screen to fit the phone display, keeping the proportions.
+- Shows Cyrillic text correctly (UTF-8 and Windows-1251 text in games).
+- Plays MIDI music with a built-in synthesizer.
+- Plays WAV, MP3 and OGG sounds when the device supports the format.
+- Supports the phone keypad: arrows, OK, soft keys, number keys, `*` and `#`.
 
-The emulator runs in two parts: `index.html` handles the screen, the sound and the keys, and `engine.js` executes the game code. The engine implements the VXP/ARM instructions, the MRE system calls used by the games (graphics, timers, keys, sound, files) and the text decoding (UTF-8 and Windows-1251).
+### How to start a game
+
+You need a game file in the `.vxp` format. KaiMRE can load it in two ways.
+
+**1. Game inside the app package.**
+Put the game in a file named `game.vxp` next to `index.html` and pack the app. The game starts when you open the app.
+
+**2. Game from a link.**
+Open the app with the address of the game in the `vxp` parameter:
+
+```
+index.html?vxp=https://example.com/game.vxp
+```
+
+The server that hosts the game must allow downloads from other sites. It must send the header `Access-Control-Allow-Origin`. If it does not, the game cannot be downloaded.
+
+### Controls
+
+| Phone key | Action in the game |
+|---|---|
+| Arrow keys | Directions |
+| OK / Enter | OK / select |
+| Soft left (F1, Call) | Left soft key |
+| Soft right (F2, Backspace) | Right soft key |
+| 0 to 9, `*`, `#` | Number keys, `*` and `#` |
+| End call / Back (EndCall, Escape) | Close the game |
+
+### Sound
+
+- **MIDI** plays once by default. Add `&loop=1` to the link to loop it, for example `index.html?vxp=...&loop=1`.
+- **WAV, MP3, OGG** play as ordinary sound files when the device supports the format.
+- MIDI is played by a synthesizer built into KaiMRE. It approximates the instruments: each instrument has its own waveform and envelope, and drums are made from noise. It is not the General MIDI sound set.
+- Sound can start only after the first key press, as browsers require.
+
+### Installing on KaiOS
+
+1. Zip the files so that `index.html` is at the root of the archive.
+2. Install the archive with a KaiOS app installer.
+3. Open KaiMRE from the app list.
+
+### How it works
+
+- `index.html` is the page. It draws the screen, scales it, loads the game, plays sound and reads the keys.
+- `engine.js` is the engine. It runs in a Web Worker, reads the game file and runs its code step by step. It sends each new screen image to the page.
+- `manifest.webapp` is the KaiOS app description. It asks for no special permissions.
+- `icons/` holds the app icons.
 
 ### Files
 
 | File | Purpose |
 |---|---|
-| `index.html` | The page: screen, scaling, loading the game, MIDI and sound, keys |
-| `engine.js` | The engine (VXP/ARM interpreter), runs in a Web Worker |
-| `manifest.webapp` | KaiOS app manifest (no special permissions) |
+| `index.html` | The page: screen, scaling, game loading, sound, keys |
+| `engine.js` | The MRE/VXP engine, runs in a Web Worker |
+| `manifest.webapp` | KaiOS app manifest |
 | `icons/` | App icons |
+| `README.md` | This file |
 | `LICENSE` | Apache License 2.0 |
-
-### Running a game
-
-You need a game file in the `.vxp` format. KaiMRE can load it in two ways:
-
-1. **From the app package.** Put the game in a file named `game.vxp` next to `index.html`, then pack the app.
-2. **From a link.** Open the app with the game address in the `vxp` parameter:
-   `index.html?vxp=https://example.com/game.vxp`
-   The server that hosts the game must allow cross-origin downloads (send the header `Access-Control-Allow-Origin`). Without it the game does not load.
-
-Press the **Back** key to close the game.
-
-### Sound
-
-- **MIDI** plays once by default. Add `&loop=1` to the link to loop it.
-- **WAV, MP3, OGG** play as sampled audio when the device supports the format.
-- MIDI is a synthesized approximation (waveforms and envelopes per instrument, drums made from noise). It is not the General MIDI sound set.
-
-### Limitations
-
-- No 3D.
-- No file picker and no SD card scanner. The game comes from the app package or from a link.
-- Checked for KaiOS 2.5 syntax and in desktop Chromium. Please test on a real device.
-- Some games may stop with an error. The error text is shown at the bottom of the screen.
-
-### Installing on KaiOS
-
-Zip the files with `index.html` at the root of the archive, then install the archive with a KaiOS app installer.
 
 ### Contributing
 
-Issues and pull requests are welcome. `engine.js` must use ES2015 syntax at most, because KaiOS 2.5 uses Gecko 48.
+Bug reports and pull requests are welcome. When you report a bug, please include the game name and the exact text of the error that appears at the bottom of the screen.
 
 ---
 
 ## Русский
 
-### Что это
+### Возможности
 
-KaiMRE — небольшой движок, который запускает игры MRE/VXP (формат Mobile Runtime Environment, которым пользовались старые кнопочные телефоны) на устройствах KaiOS 2.5. Это веб-приложение: интерпретатор VXP/ARM работает в Web Worker, а страница рисует экран и обрабатывает клавиши и звук.
+- Запускает игры `.vxp` (MRE) на устройствах KaiOS 2.5.
+- Растягивает экран игры на весь дисплей телефона с сохранением пропорций.
+- Правильно показывает русский текст (UTF-8 и Windows-1251 в играх).
+- Проигрывает MIDI-музыку встроенным синтезатором.
+- Проигрывает WAV, MP3 и OGG, если устройство поддерживает формат.
+- Работает с клавишами телефона: стрелки, OK, софт-клавиши, цифры, `*` и `#`.
 
-Эмулятор работает в две части: `index.html` отвечает за экран, звук и клавиши, а `engine.js` выполняет код игры. Движок реализует инструкции VXP/ARM, системные вызовы MRE, которые используют игры (графика, таймеры, клавиши, звук, файлы), и декодирование текста (UTF-8 и Windows-1251).
+### Как запустить игру
+
+Нужен файл игры в формате `.vxp`. KaiMRE может загрузить его двумя способами.
+
+**1. Игра внутри пакета приложения.**
+Положите игру в файл `game.vxp` рядом с `index.html` и упакуйте приложение. Игра запустится сразу при открытии приложения.
+
+**2. Игра по ссылке.**
+Откройте приложение с адресом игры в параметре `vxp`:
+
+```
+index.html?vxp=https://example.com/game.vxp
+```
+
+Сервер, на котором лежит игра, должен разрешать загрузку с других сайтов: он должен отправлять заголовок `Access-Control-Allow-Origin`. Если этого нет, игру скачать нельзя.
+
+### Управление
+
+| Клавиша телефона | Действие в игре |
+|---|---|
+| Стрелки | Направления |
+| OK / Enter | Подтверждение, выбор |
+| Левая софт-клавиша (F1, Call) | Левая софт-клавиша |
+| Правая софт-клавиша (F2, Backspace) | Правая софт-клавиша |
+| Цифры 0–9, `*`, `#` | Цифровые клавиши, `*` и `#` |
+| Завершение вызова / Назад (EndCall, Escape) | Закрыть игру |
+
+### Звук
+
+- **MIDI** по умолчанию играет один раз. Добавьте `&loop=1` к ссылке, чтобы зациклить, например `index.html?vxp=...&loop=1`.
+- **WAV, MP3, OGG** воспроизводятся как обычные звуковые файлы, если устройство поддерживает формат.
+- MIDI играет синтезатор, встроенный в KaiMRE. Он приблизительно передаёт инструменты: у каждого инструмента своя форма волны и огибающая, ударные сделаны из шума. Это не набор General MIDI.
+- Звук начинает играть после первого нажатия клавиши: так требуют браузеры.
+
+### Установка на KaiOS
+
+1. Заархивируйте файлы так, чтобы `index.html` лежал в корне архива.
+2. Установите архив через установщик приложений KaiOS.
+3. Откройте KaiMRE из списка приложений.
+
+### Как это устроено
+
+- `index.html` — страница. Рисует экран, растягивает его, загружает игру, проигрывает звук и читает клавиши.
+- `engine.js` — эмулятор. Работает в Web Worker, читает файл игры и выполняет её код шаг за шагом. Каждый новый кадр отправляет на страницу.
+- `manifest.webapp` — описание приложения для KaiOS. Особых разрешений не запрашивает.
+- `icons/` — иконки приложения.
 
 ### Файлы
 
 | Файл | Назначение |
 |---|---|
-| `index.html` | Страница: экран, масштабирование, загрузка игры, MIDI и звук, клавиши |
-| `engine.js` | Движок (интерпретатор VXP/ARM), работает в Web Worker |
-| `manifest.webapp` | Манифест приложения KaiOS (без специальных прав) |
+| `index.html` | Страница: экран, растягивание, загрузка игры, звук, клавиши |
+| `engine.js` | Эмулятор MRE/VXP, работает в Web Worker |
+| `manifest.webapp` | Манифест приложения KaiOS |
 | `icons/` | Иконки приложения |
+| `README.md` | Этот файл |
 | `LICENSE` | Лицензия Apache License 2.0 |
-
-### Запуск игры
-
-Нужен файл игры в формате `.vxp`. KaiMRE может загрузить его двумя способами:
-
-1. **Из пакета приложения.** Положите игру в файл `game.vxp` рядом с `index.html`, затем упакуйте приложение.
-2. **По ссылке.** Откройте приложение с адресом игры в параметре `vxp`:
-   `index.html?vxp=https://example.com/game.vxp`
-   Сервер, на котором лежит игра, должен разрешать загрузку с другого домена (отправлять заголовок `Access-Control-Allow-Origin`). Без этого игра не загрузится.
-
-Чтобы закрыть игру, нажмите клавишу **Назад (Back)**.
-
-### Звук
-
-- **MIDI** по умолчанию играет один раз. Добавьте `&loop=1` к ссылке, чтобы зациклить.
-- **WAV, MP3, OGG** воспроизводятся как обычный звук, если устройство поддерживает формат.
-- MIDI синтезируется приближённо (формы волн и огибающие для каждого инструмента, ударные из шума). Это не набор General MIDI.
-
-### Ограничения
-
-- Нет 3D.
-- Нет выбора файлов на телефоне и сканера SD-карты. Игра берётся из пакета приложения или по ссылке.
-- Проверено на синтаксис KaiOS 2.5 и в настольном Chromium. Пожалуйста, проверьте на настоящем устройстве.
-- Некоторые игры могут остановиться с ошибкой. Текст ошибки показывается внизу экрана.
-
-### Установка на KaiOS
-
-Заархивируйте файлы так, чтобы `index.html` лежал в корне архива, и установите архив через установщик приложений KaiOS.
 
 ### Участие в проекте
 
-Сообщения об ошибках и pull request'ы приветствуются. В `engine.js` используйте синтаксис не выше ES2015, потому что KaiOS 2.5 работает на Gecko 48.
+Сообщения об ошибках и pull request'ы приветствуются. Если сообщаете об ошибке, укажите название игры и точный текст ошибки внизу экрана.
