@@ -1,22 +1,14 @@
 {
   "name": "KaiMRE",
-  "description": "Runs MRE/VXP games from the game.vxp file in the package",
+  "description": "Runs MRE/VXP games from a game.vxp file in the app package or from a link",
   "version": "1.0.0",
   "launch_path": "/index.html",
-  "developer": {
-    "name": "Dalba"
-  },
+  "developer": { "name": "Dalba" },
   "default_locale": "en",
   "icons": {
     "32": "/icons/icon32.png",
     "64": "/icons/icon64.png",
     "128": "/icons/icon128.png"
   },
-  "permissions": {
-    "device-storage:sdcard": {
-      "access": "readonly",
-      "description": "To find .vxp games on the SD card"
-    }
-  },
-  "type": "privileged"
+  "permissions": {}
 }
